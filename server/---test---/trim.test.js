@@ -1,4 +1,4 @@
-import { Trim } from '../Routes/functions/trim';
+import { Trim } from '../Routes/functions/automatic/trim';
 import XLSX from 'xlsx';
 
 test('leading and trailing spaces', () => {
