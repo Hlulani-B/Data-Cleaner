@@ -8,11 +8,25 @@ function CsvFile() {
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-    const found = stored.find((f) => String(f.id) === String(fileId));
+    let found = stored.find((f) => String(f.id) === String(fileId));
+
+    // Fallback: ID not found (tempId may have been replaced by Neon sync)
+    // Try the most recent CSV file in localStorage
+    if (!found) {
+      const csvFiles = stored.filter((f) => f.filetype === "csv");
+      if (csvFiles.length > 0) {
+        found = csvFiles.sort((a, b) => {
+          const ta = new Date(a.createdAt || 0).getTime();
+          const tb = new Date(b.createdAt || 0).getTime();
+          return tb - ta;
+        })[0];
+      }
+    }
+
     if (found) {
       setFile(found);
     } else {
-      // Fallback: try loading from Neon
+      // Last resort: try loading from Neon
       fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

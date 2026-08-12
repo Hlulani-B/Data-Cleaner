@@ -47,10 +47,10 @@ export default async function handler(req, res) {
               filetype: f.filetype,
               sheets: data.sheets || {},
               sheetNames: data.sheetNames || [],
-              createdAt: f.id, // use id as timestamp fallback
+              createdAt: new Date().toISOString(),
             };
           } catch {
-            return { id: f.id, filename: f.filename, filetype: f.filetype, sheets: {}, sheetNames: [] };
+            return { id: f.id, filename: f.filename, filetype: f.filetype, sheets: {}, sheetNames: [], createdAt: new Date().toISOString() };
           }
         });
         return res.status(200).json({ files: parsed });

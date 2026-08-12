@@ -148,11 +148,17 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
       let idx = stored.findIndex((f) => String(f.id) === String(file.id));
 
+      // Fallback: match by filename + filetype (handles tempId → Neon ID swap)
+      if (idx === -1 && file.filename) {
+        idx = stored.findIndex(
+          (f) => f.filename === file.filename && f.filetype === file.filetype
+        );
+      }
+
       // If file was loaded from Neon only, add it to localStorage
       if (idx === -1 && file.sheets) {
         stored.unshift({ ...file });
         idx = 0;
-        localStorage.setItem("dc_files", JSON.stringify(stored));
       }
 
       if (idx !== -1) {
@@ -850,12 +856,26 @@ function ExcelFile() {
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-    const found = stored.find((f) => String(f.id) === String(fileId));
+    let found = stored.find((f) => String(f.id) === String(fileId));
+
+    // Fallback: ID not found (tempId may have been replaced by Neon sync)
+    // Try the most recent Excel file in localStorage
+    if (!found) {
+      const excelFiles = stored.filter((f) => f.filetype === "excel");
+      if (excelFiles.length > 0) {
+        found = excelFiles.sort((a, b) => {
+          const ta = new Date(a.createdAt || 0).getTime();
+          const tb = new Date(b.createdAt || 0).getTime();
+          return tb - ta;
+        })[0];
+      }
+    }
+
     if (found) {
       setFile(found);
       setActiveSheet(found.sheetNames[0] || "");
     } else {
-      // Fallback: try loading from Neon
+      // Last resort: try loading from Neon
       fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

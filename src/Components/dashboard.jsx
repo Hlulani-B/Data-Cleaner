@@ -27,7 +27,7 @@ function Dashboard() {
         body: JSON.stringify({ email, name: name || email.split("@")[0] }),
       }).catch(() => {});
 
-      // Load files from Neon (best-effort, fall back to localStorage)
+      // Load files from Neon and merge with localStorage
       fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -35,13 +35,40 @@ function Dashboard() {
       })
         .then((r) => r.json())
         .then((res) => {
-          if (res.files && res.files.length > 0) {
-            setFiles(res.files);
-            localStorage.setItem("dc_files", JSON.stringify(res.files));
+          const neonFiles = res.files || [];
+          const localFiles = JSON.parse(localStorage.getItem("dc_files") || "[]");
+
+          if (neonFiles.length > 0) {
+            const neonIds = new Set(neonFiles.map((f) => String(f.id)));
+            const neonNames = new Set(neonFiles.map((f) => f.filename));
+
+            // Build merged list: start with Neon files
+            const merged = [...neonFiles];
+
+            // Keep local-only files (not yet in Neon) and
+            // replace tempIds with real Neon IDs when filename matches
+            for (const lf of localFiles) {
+              if (neonIds.has(String(lf.id))) continue; // already in Neon
+              const match = neonFiles.find(
+                (nf) => nf.filename === lf.filename && !merged.find((m) => String(m.id) === String(lf.id))
+              );
+              if (match) {
+                // Neon has same file by name — update Neon file's data if local has sheets
+                const idx = merged.findIndex((m) => String(m.id) === String(match.id));
+                if (idx !== -1 && lf.sheets && Object.keys(lf.sheets).length > 0) {
+                  merged[idx] = { ...merged[idx], sheets: lf.sheets, sheetNames: lf.sheetNames };
+                }
+              } else if (!neonNames.has(lf.filename)) {
+                // File only exists locally — keep it
+                merged.push(lf);
+              }
+            }
+
+            setFiles(merged);
+            localStorage.setItem("dc_files", JSON.stringify(merged));
           } else {
-            // Fall back to localStorage
-            const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-            setFiles(stored);
+            // Neon returned nothing — fall back to localStorage
+            setFiles(localFiles);
           }
         })
         .catch(() => {
