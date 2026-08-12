@@ -160,7 +160,6 @@ export function splitColumn(data, column, delimiter, occurrence, newCol1, newCol
       out[newCol2] = "";
     }
 
-    delete out[column];
     return out;
   });
 }

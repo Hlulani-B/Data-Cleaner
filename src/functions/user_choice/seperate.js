@@ -18,7 +18,6 @@ class Separate {
                 row[new_column2] = "";
             }
 
-            delete row[column];
         });
 
         return XlSX.utils.json_to_sheet(data);
