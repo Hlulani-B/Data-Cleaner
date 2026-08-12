@@ -885,6 +885,30 @@
   gap: 10px;
 }
 
+.function-category {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.function-category:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.category-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.85;
+}
+
 .func-card {
   display: flex;
   flex-direction: column;

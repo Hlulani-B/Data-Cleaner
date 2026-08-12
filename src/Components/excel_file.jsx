@@ -197,78 +197,133 @@ function runMathOp(data, opKey, extra) {
   }
 }
 
-const FUNCTIONS = [
-  // Row-level
-  { key: "removeEmpty", label: "Remove Empty Rows", desc: "Remove rows where all values are empty", needsColumn: false },
-  { key: "duplicates", label: "Remove Duplicates", desc: "Remove exact duplicate rows", needsColumn: false },
-  { key: "search", label: "Search Rows", desc: "Keep rows matching a keyword", needsColumn: false, needsSearchKeyword: true },
-  { key: "sampleRows", label: "Sample Rows", desc: "Keep first N or random N rows", needsColumn: false, needsSampleParams: true },
-  { key: "reorderColumns", label: "Reorder Columns", desc: "Change the order of columns", needsColumn: false, needsReorderParams: true },
-  // Case transforms
-  { key: "lower", label: "Lowercase", desc: "Convert text to lowercase", needsColumn: true },
-  { key: "upper", label: "Uppercase", desc: "Convert text to UPPERCASE", needsColumn: true },
-  { key: "proper", label: "Proper Case", desc: "Capitalize First Letter Of Each Word", needsColumn: true },
-  { key: "sentenceCase", label: "Sentence Case", desc: "Capitalize first letter only", needsColumn: true },
-  // Column management
-  { key: "removeColumn", label: "Remove Column", desc: "Delete a column from the dataset", needsColumn: true },
-  { key: "renameColumn", label: "Rename Column", desc: "Give a column a new name", needsColumn: true, needsRenameParams: true },
-  { key: "duplicateColumn", label: "Duplicate Column", desc: "Copy a column under a new name", needsColumn: true, needsDuplicateParams: true },
-  // Type & conversion
-  { key: "typeConversion", label: "Type Conversion", desc: "Convert column values to number, string, or boolean", needsColumn: true },
-  { key: "labelEncode", label: "Label Encode", desc: "Replace categories with integers", needsColumn: true },
-  { key: "oneHotEncode", label: "One-Hot Encode", desc: "Turn categories into true/false columns", needsColumn: true },
-  // Text cleaning
-  { key: "removeSpecialCharacters", label: "Remove Special Chars", desc: "Keep only letters, numbers, and spaces", needsColumn: true },
-  { key: "removeNumbers", label: "Remove Numbers", desc: "Strip digits from text", needsColumn: true },
-  { key: "collapseWhitespace", label: "Collapse Whitespace", desc: "Normalize spaces in text", needsColumn: true },
-  { key: "reverseText", label: "Reverse Text", desc: "Reverse characters in each cell", needsColumn: true },
-  // Text params
-  { key: "replaceValues", label: "Replace Value", desc: "Replace exact cell value with another value", needsColumn: true, needsValueParams: true },
-  { key: "rewrite", label: "Rewrite (Substring)", desc: "Replace a substring within cell values", needsColumn: true, needsValueParams: true },
-  { key: "replace", label: "Replace Text", desc: "Replace substring (all or nth occurrence)", needsColumn: true, needsReplaceParams: true },
-  { key: "separate", label: "Separate Column", desc: "Split one column into two by a delimiter", needsColumn: true },
-  { key: "truncateText", label: "Truncate", desc: "Limit text to N characters", needsColumn: true, needsTruncateParams: true },
-  { key: "padLeft", label: "Pad Left", desc: "Pad text on the left", needsColumn: true, needsPadParams: true },
-  { key: "padRight", label: "Pad Right", desc: "Pad text on the right", needsColumn: true, needsPadParams: true },
-  // New columns from text
-  { key: "extractSubstring", label: "Extract Substring", desc: "Copy a slice of text to a new column", needsColumn: true, needsSubstringParams: true },
-  { key: "countCharacters", label: "Count Characters", desc: "Add a column with character counts", needsColumn: true, needsCountParams: true },
-  { key: "countWords", label: "Count Words", desc: "Add a column with word counts", needsColumn: true, needsCountParams: true },
-  { key: "containsCheck", label: "Contains", desc: "Add true/false 'contains substring' column", needsColumn: true, needsCheckParams: true },
-  { key: "startsWithCheck", label: "Starts With", desc: "Add true/false 'starts with' column", needsColumn: true, needsCheckParams: true },
-  { key: "endsWithCheck", label: "Ends With", desc: "Add true/false 'ends with' column", needsColumn: true, needsCheckParams: true },
-  { key: "regexExtract", label: "Regex Extract", desc: "Extract text matching a regex into a new column", needsColumn: true, needsRegexParams: true },
-  { key: "regexReplace", label: "Regex Replace", desc: "Replace text matching a regex", needsColumn: true, needsRegexParams: true },
-  // Multi-column
-  { key: "join", label: "Join Columns", desc: "Combine multiple columns with a delimiter", needsColumn: false, multiColumn: true },
-  { key: "concatenate", label: "Concatenate Columns", desc: "Combine multiple columns without a delimiter", needsColumn: false, multiColumn: true },
-  // Math
-  { key: "math", label: "Math Operations", desc: "Arithmetic, rounding, absolute, and more", needsColumn: false, isMath: true },
-  { key: "absolute", label: "Absolute Value", desc: "Convert numbers to their absolute value", needsColumn: true },
-  // Filter / sort
-  { key: "filterRows", label: "Filter Rows", desc: "Keep rows matching a condition", needsColumn: true, needsFilterParams: true },
-  { key: "sortRows", label: "Sort Rows", desc: "Sort rows by a column", needsColumn: true, needsSortParams: true },
-  // Dates
-  { key: "dateStandard", label: "Date Standardize", desc: "Standardize date format in a column", needsColumn: true },
-  { key: "extractYear", label: "Extract Year", desc: "Pull year into a new column", needsColumn: true, needsDateOp: true },
-  { key: "extractMonth", label: "Extract Month", desc: "Pull month into a new column", needsColumn: true, needsDateOp: true },
-  { key: "extractDay", label: "Extract Day", desc: "Pull day of month into a new column", needsColumn: true, needsDateOp: true },
-  { key: "extractDayOfWeek", label: "Extract Weekday", desc: "Pull weekday name into a new column", needsColumn: true, needsDateOp: true },
-  { key: "addDays", label: "Add Days", desc: "Add or subtract days from dates", needsColumn: true, needsAddDaysParams: true },
-  { key: "ageFromBirthdate", label: "Age from Date", desc: "Calculate age from a date column", needsColumn: true, needsDateOp: true },
-  { key: "isWeekend", label: "Is Weekend", desc: "Add true/false weekend column", needsColumn: true, needsDateOp: true },
-  { key: "dateDifference", label: "Date Difference", desc: "Days/hours/minutes between two date columns", needsColumn: false, needsDateDiffParams: true },
-  // Formatting & validation
-  { key: "currencyFormat", label: "Currency Format", desc: "Format numbers as currency", needsColumn: true, needsFormatOp: true },
-  { key: "percentageFormat", label: "Percentage Format", desc: "Format numbers as percentages", needsColumn: true, needsFormatOp: true },
-  { key: "emailValidityCheck", label: "Email Valid", desc: "Add true/false email validation column", needsColumn: true, needsValidationOp: true },
-  { key: "phoneFormatCheck", label: "Phone Valid", desc: "Add true/false phone validation column", needsColumn: true, needsValidationOp: true },
-  { key: "flagOutliers", label: "Flag Outliers", desc: "Mark numeric outliers using std dev", needsColumn: true, needsValidationOp: true },
-  // Values & empties
-  { key: "getValues", label: "Get Unique Values", desc: "Show all unique values in a column", needsColumn: true, isGetValues: true },
-  { key: "removeRowWithValue", label: "Remove Row by Value", desc: "Delete all rows where a column equals a value", needsColumn: true, needsRemoveValue: true },
-  { key: "fillEmpty", label: "Fill Empty Values", desc: "Fill empty cells with mean, median, or a custom value", needsColumn: true, needsFillStrategy: true },
+const FUNCTION_CATEGORIES = [
+  {
+    name: "Row Operations",
+    items: [
+      { key: "removeEmpty", label: "Remove Empty Rows", desc: "Remove rows where all values are empty", needsColumn: false },
+      { key: "duplicates", label: "Remove Duplicates", desc: "Remove exact duplicate rows", needsColumn: false },
+      { key: "search", label: "Search Rows", desc: "Keep rows matching a keyword", needsColumn: false, needsSearchKeyword: true },
+      { key: "sampleRows", label: "Sample Rows", desc: "Keep first N or random N rows", needsColumn: false, needsSampleParams: true },
+      { key: "reorderColumns", label: "Reorder Columns", desc: "Change the order of columns", needsColumn: false, needsReorderParams: true },
+    ],
+  },
+  {
+    name: "Filter & Sort",
+    items: [
+      { key: "filterRows", label: "Filter Rows", desc: "Keep rows matching a condition", needsColumn: true, needsFilterParams: true },
+      { key: "sortRows", label: "Sort Rows", desc: "Sort rows by a column", needsColumn: true, needsSortParams: true },
+    ],
+  },
+  {
+    name: "Column Management",
+    items: [
+      { key: "removeColumn", label: "Remove Column", desc: "Delete a column from the dataset", needsColumn: true },
+      { key: "renameColumn", label: "Rename Column", desc: "Give a column a new name", needsColumn: true, needsRenameParams: true },
+      { key: "duplicateColumn", label: "Duplicate Column", desc: "Copy a column under a new name", needsColumn: true, needsDuplicateParams: true },
+    ],
+  },
+  {
+    name: "Type & Encoding",
+    items: [
+      { key: "typeConversion", label: "Type Conversion", desc: "Convert column values to number, string, or boolean", needsColumn: true },
+      { key: "labelEncode", label: "Label Encode", desc: "Replace categories with integers", needsColumn: true },
+      { key: "oneHotEncode", label: "One-Hot Encode", desc: "Turn categories into true/false columns", needsColumn: true },
+    ],
+  },
+  {
+    name: "Case & Text Formatting",
+    items: [
+      { key: "lower", label: "Lowercase", desc: "Convert text to lowercase", needsColumn: true },
+      { key: "upper", label: "Uppercase", desc: "Convert text to UPPERCASE", needsColumn: true },
+      { key: "proper", label: "Proper Case", desc: "Capitalize First Letter Of Each Word", needsColumn: true },
+      { key: "sentenceCase", label: "Sentence Case", desc: "Capitalize first letter only", needsColumn: true },
+    ],
+  },
+  {
+    name: "Text Cleaning",
+    items: [
+      { key: "removeSpecialCharacters", label: "Remove Special Chars", desc: "Keep only letters, numbers, and spaces", needsColumn: true },
+      { key: "removeNumbers", label: "Remove Numbers", desc: "Strip digits from text", needsColumn: true },
+      { key: "collapseWhitespace", label: "Collapse Whitespace", desc: "Normalize spaces in text", needsColumn: true },
+      { key: "reverseText", label: "Reverse Text", desc: "Reverse characters in each cell", needsColumn: true },
+    ],
+  },
+  {
+    name: "Find, Replace & Extract",
+    items: [
+      { key: "replaceValues", label: "Replace Value", desc: "Replace exact cell value with another value", needsColumn: true, needsValueParams: true },
+      { key: "rewrite", label: "Rewrite (Substring)", desc: "Replace a substring within cell values", needsColumn: true, needsValueParams: true },
+      { key: "replace", label: "Replace Text", desc: "Replace substring (all or nth occurrence)", needsColumn: true, needsReplaceParams: true },
+      { key: "separate", label: "Separate Column", desc: "Split one column into two by a delimiter", needsColumn: true },
+      { key: "truncateText", label: "Truncate", desc: "Limit text to N characters", needsColumn: true, needsTruncateParams: true },
+      { key: "padLeft", label: "Pad Left", desc: "Pad text on the left", needsColumn: true, needsPadParams: true },
+      { key: "padRight", label: "Pad Right", desc: "Pad text on the right", needsColumn: true, needsPadParams: true },
+      { key: "extractSubstring", label: "Extract Substring", desc: "Copy a slice of text to a new column", needsColumn: true, needsSubstringParams: true },
+    ],
+  },
+  {
+    name: "Text Analysis",
+    items: [
+      { key: "countCharacters", label: "Count Characters", desc: "Add a column with character counts", needsColumn: true, needsCountParams: true },
+      { key: "countWords", label: "Count Words", desc: "Add a column with word counts", needsColumn: true, needsCountParams: true },
+      { key: "containsCheck", label: "Contains", desc: "Add true/false 'contains substring' column", needsColumn: true, needsCheckParams: true },
+      { key: "startsWithCheck", label: "Starts With", desc: "Add true/false 'starts with' column", needsColumn: true, needsCheckParams: true },
+      { key: "endsWithCheck", label: "Ends With", desc: "Add true/false 'ends with' column", needsColumn: true, needsCheckParams: true },
+      { key: "regexExtract", label: "Regex Extract", desc: "Extract text matching a regex into a new column", needsColumn: true, needsRegexParams: true },
+      { key: "regexReplace", label: "Regex Replace", desc: "Replace text matching a regex", needsColumn: true, needsRegexParams: true },
+    ],
+  },
+  {
+    name: "Combine & Split",
+    items: [
+      { key: "join", label: "Join Columns", desc: "Combine multiple columns with a delimiter", needsColumn: false, multiColumn: true },
+      { key: "concatenate", label: "Concatenate Columns", desc: "Combine multiple columns without a delimiter", needsColumn: false, multiColumn: true },
+    ],
+  },
+  {
+    name: "Math",
+    items: [
+      { key: "math", label: "Math Operations", desc: "Arithmetic, rounding, absolute, and more", needsColumn: false, isMath: true },
+      { key: "absolute", label: "Absolute Value", desc: "Convert numbers to their absolute value", needsColumn: true },
+    ],
+  },
+  {
+    name: "Date Operations",
+    items: [
+      { key: "dateStandard", label: "Date Standardize", desc: "Standardize date format in a column", needsColumn: true },
+      { key: "extractYear", label: "Extract Year", desc: "Pull year into a new column", needsColumn: true, needsDateOp: true },
+      { key: "extractMonth", label: "Extract Month", desc: "Pull month into a new column", needsColumn: true, needsDateOp: true },
+      { key: "extractDay", label: "Extract Day", desc: "Pull day of month into a new column", needsColumn: true, needsDateOp: true },
+      { key: "extractDayOfWeek", label: "Extract Weekday", desc: "Pull weekday name into a new column", needsColumn: true, needsDateOp: true },
+      { key: "addDays", label: "Add Days", desc: "Add or subtract days from dates", needsColumn: true, needsAddDaysParams: true },
+      { key: "ageFromBirthdate", label: "Age from Date", desc: "Calculate age from a date column", needsColumn: true, needsDateOp: true },
+      { key: "isWeekend", label: "Is Weekend", desc: "Add true/false weekend column", needsColumn: true, needsDateOp: true },
+      { key: "dateDifference", label: "Date Difference", desc: "Days/hours/minutes between two date columns", needsColumn: false, needsDateDiffParams: true },
+    ],
+  },
+  {
+    name: "Format & Validate",
+    items: [
+      { key: "currencyFormat", label: "Currency Format", desc: "Format numbers as currency", needsColumn: true, needsFormatOp: true },
+      { key: "percentageFormat", label: "Percentage Format", desc: "Format numbers as percentages", needsColumn: true, needsFormatOp: true },
+      { key: "emailValidityCheck", label: "Email Valid", desc: "Add true/false email validation column", needsColumn: true, needsValidationOp: true },
+      { key: "phoneFormatCheck", label: "Phone Valid", desc: "Add true/false phone validation column", needsColumn: true, needsValidationOp: true },
+      { key: "flagOutliers", label: "Flag Outliers", desc: "Mark numeric outliers using std dev", needsColumn: true, needsValidationOp: true },
+    ],
+  },
+  {
+    name: "Values & Missing Data",
+    items: [
+      { key: "getValues", label: "Get Unique Values", desc: "Show all unique values in a column", needsColumn: true, isGetValues: true },
+      { key: "removeRowWithValue", label: "Remove Row by Value", desc: "Delete all rows where a column equals a value", needsColumn: true, needsRemoveValue: true },
+      { key: "fillEmpty", label: "Fill Empty Values", desc: "Fill empty cells with mean, median, or a custom value", needsColumn: true, needsFillStrategy: true },
+    ],
+  },
 ];
+
+// Flat alias for any code that still expects a single array.
+const FUNCTIONS = FUNCTION_CATEGORIES.flatMap((cat) => cat.items);
 
 /* ─── Shared FileView component (used by both Excel and CSV) ─── */
 export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, onSheetChange }) {
@@ -655,28 +710,39 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               {/* Functions Grid */}
               <section className="functions-section">
                 <h3 className="section-heading">Functions</h3>
-                <div className="functions-grid">
-                  {/* Empty Values Inspector */}
-                  <button
-                    className="func-card"
-                    onClick={() => setShowEmptyValues(true)}
-                    disabled={loading}
-                  >
-                    <span className="func-name">Empty Values</span>
-                    <span className="func-desc">Inspect & remove rows with empty cells</span>
-                  </button>
-                  {FUNCTIONS.map((fn) => (
+
+                <div className="function-category">
+                  <h4 className="category-heading">Inspectors</h4>
+                  <div className="functions-grid">
                     <button
-                      key={fn.key}
                       className="func-card"
-                      onClick={() => handleFuncClick(fn)}
+                      onClick={() => setShowEmptyValues(true)}
                       disabled={loading}
                     >
-                      <span className="func-name">{fn.label}</span>
-                      <span className="func-desc">{fn.desc}</span>
+                      <span className="func-name">Empty Values</span>
+                      <span className="func-desc">Inspect & remove rows with empty cells</span>
                     </button>
-                  ))}
+                  </div>
                 </div>
+
+                {FUNCTION_CATEGORIES.map((cat) => (
+                  <div key={cat.name} className="function-category">
+                    <h4 className="category-heading">{cat.name}</h4>
+                    <div className="functions-grid">
+                      {cat.items.map((fn) => (
+                        <button
+                          key={fn.key}
+                          className="func-card"
+                          onClick={() => handleFuncClick(fn)}
+                          disabled={loading}
+                        >
+                          <span className="func-name">{fn.label}</span>
+                          <span className="func-desc">{fn.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </section>
 
               {/* Values Panel (getValues / replace / rewrite / remove row) */}
