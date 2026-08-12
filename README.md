@@ -1,14 +1,15 @@
 # Data-Cleaner
 
-A full-stack web application for cleaning and processing CSV/XLSX files. Sign in with Google, upload a spreadsheet, run an automatic initial clean, then apply individual cleaning functions — with undo and draft history.
+A full-stack web application for cleaning and processing CSV/XLSX files. Sign in with Google, upload a spreadsheet, run an automatic initial clean, then apply individual cleaning functions — with undo, draft history, and Neon database persistence.
 
 ## Features
 
 ### Authentication
 - **Google Sign-In** via Firebase — protects all routes behind a login screen
+- **Neon Postgres registration** — new users are automatically registered in the cloud database on sign-in
 
 ### Automatic Cleaning (Initial Clean)
-Bundled into one action that must be run before other functions unlock:
+Bundled into one action that must be run before other functions unlock. **Persists per file+sheet** so it only runs once:
 - **Trim** — removes leading, trailing, and extra middle whitespace
 - **Clean** — removes empty rows, trims strings, normalizes nulls
 - **Remove Duplicates** — removes exact duplicate rows
@@ -17,13 +18,25 @@ Bundled into one action that must be run before other functions unlock:
 Results are shown in a dismissible banner with row counts and stats.
 
 ### User-Selected Functions
-Applied individually after the initial clean. Some require a column parameter:
-- **Lowercase / Uppercase / Proper Case** — convert text case in a column
+Applied individually after the initial clean. Some require a column or multi-column selection:
+
+#### Single Column
+- **Lowercase / Uppercase / Proper Case** — convert text case
 - **Remove Column** — drop a column from the dataset
 - **Remove Empty Rows** — remove rows where all values are empty
-- **Missing Values** — find rows with missing data or remove them
 - **Date Standardization** — reformat a date column (YYYY-MM-DD, MM/DD/YYYY, DD-MM-YYYY)
 - **Type Conversion** — cast a column to number, string, or boolean
+- **Separate Column** — split one column into two by a delimiter and occurrence position
+
+#### Multi-Column
+- **Join Columns** — combine multiple columns into one with a custom delimiter
+- **Concatenate Columns** — combine multiple columns into one, with an optional custom string appended
+
+### Empty Values Inspector
+Interactive view to inspect and remove rows with empty/missing data:
+- Color-coded table: red cells for empty values, yellow rows for rows with empties
+- Stats dashboard: total rows, rows with empty cells, fully empty rows, total empty cells
+- Batch actions: select all empty rows, select fully empty rows only, remove selected or all
 
 ### Other
 - **Undo** — revert the last applied operation one step at a time
@@ -37,7 +50,7 @@ Applied individually after the initial clean. Some require a column parameter:
 |--------------|----------------------------------------------------|
 | Frontend     | React 19, React Router 7, Vite 8                  |
 | Auth         | Firebase Authentication (Google Sign-In)           |
-| Backend      | Vercel serverless API routes (`api/`)              |
+| Backend      | Vercel serverless (3 functions) + Express dev server |
 | Database     | Neon Postgres (`@neondatabase/serverless`)         |
 | Spreadsheets | xlsx (client-side parsing and export)              |
 | AI           | OpenAI, Hugging Face, Google Gemini, Cerebras, Groq |
@@ -50,16 +63,18 @@ Applied individually after the initial clean. Some require a column parameter:
 npm install
 ```
 
-Create a `.env` file with the following variables:
+Create a `.env` file with the following variables (no inline comments — dotenv doesn't support them):
 
 ```
-# Database & AI (server-side)
-DATABASE_URL=             # Neon Postgres connection string
-OPENAI_API_KEY=           # OpenAI API key
-HUGGINGFACE_API_KEY=      # Hugging Face Inference API key
-GOOGLE_AI_API_KEY=        # Google Generative AI API key
-CEREBRAS_API_KEY=         # Cerebras Cloud API key
-GROQ_API_KEY=             # Groq API key
+# Database
+DATABASE_URL=postgresql://...
+
+# AI provider keys
+OPENAI_API_KEY=
+HUGGINGFACE_API_KEY=
+GOOGLE_AI_API_KEY=
+CEREBRAS_API_KEY=
+GROQ_API_KEY=
 
 # Firebase (client-side, VITE_ prefix required)
 VITE_FIREBASE_API_KEY=
@@ -72,13 +87,19 @@ VITE_FIREBASE_APP_ID=
 
 ## Run
 
-Start the frontend dev server:
+Start the full-stack dev server (frontend + API on one port):
 
 ```bash
 npm run dev
 ```
 
-Cleaning operations run entirely client-side — no separate API server needed for core functionality. Start the API server separately (e.g. `vercel dev`) only for AI assistance features.
+This starts Express with Vite middleware at **http://localhost:3000** — serves both the React frontend and all API routes.
+
+For frontend-only development:
+
+```bash
+npm run dev:client
+```
 
 ## Tests
 
@@ -93,25 +114,47 @@ npm run build
 npm run preview   # preview the production build
 ```
 
+## Architecture
+
+### Serverless Functions (3 total — Vercel free-tier compatible)
+
+| Endpoint              | Handles                                           |
+|-----------------------|---------------------------------------------------|
+| `api/operations.js`   | All 16 data transforms (upper, lower, proper, clean, trim, duplicates, removeEmpty, removeColumn, missingValues, dateStandard, typeConversion, separate, join, concatenate, datatype, upload) |
+| `api/auth.js`         | User registration in Neon Postgres                |
+| `api/ai.js`           | Multi-provider AI orchestration                   |
+
+Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites. The operations handler auto-detects the operation from the URL path.
+
+### Dev Server
+
+`server/index.js` — Express server that:
+- Loads `.env` before dynamically importing API handlers
+- Mounts all API routes with backward-compatible legacy paths
+- Uses Vite as middleware for the React frontend (with HMR)
+- Gracefully skips the AI module if its dependencies aren't installed
+
 ## Project Structure
 
 ```
-├── api/                          # Serverless API routes
+├── api/                          # Serverless API (3 functions)
 │   ├── functions/
 │   │   ├── automatic/            # Auto-applied operations (trim, clean, duplicates, datatype)
-│   │   └── user_choice/          # User-selected operations (case, dates, types, etc.)
+│   │   └── user_choice/          # User-selected operations (case, dates, types, separate, join, etc.)
 │   ├── database/
-│   │   └── neon.js               # Neon Postgres database class
-│   ├── ai.js                     # Multi-provider AI orchestration
-│   ├── clean.js                  # Initial clean endpoint
-│   ├── upload.js                 # JSON-to-XLSX export endpoint
-│   └── [operation].js            # One endpoint per cleaning function
+│   │   └── neon.js               # Neon Postgres database class with ensureTables()
+│   ├── operations.js             # Unified handler for all data transforms
+│   ├── auth.js                   # User registration endpoint
+│   └── ai.js                     # Multi-provider AI orchestration
+├── server/
+│   └── index.js                  # Express dev server (API + Vite middleware)
 ├── src/
 │   ├── Components/
-│   │   ├── login.jsx             # Login page — Google sign-in
-│   │   ├── dashboard.jsx         # Dashboard — upload + file cards
-│   │   ├── excel_file.jsx        # Excel file view — sheet sidebar + functions
-│   │   └── csv_file.jsx          # CSV file view — single sheet + functions
+│   │   ├── login.jsx             # Login page — Google sign-in + Neon registration
+│   │   ├── dashboard.jsx         # Dashboard — upload + file cards + Neon sync
+│   │   ├── excel_file.jsx        # Excel view — sheet sidebar, functions, modals
+│   │   ├── csv_file.jsx          # CSV view — single sheet + functions
+│   │   └── emptyvalues.jsx       # Empty values inspector component
 │   ├── utils/
 │   │   └── cleaners.js           # Client-side cleaning utilities
 │   ├── firebase.js               # Firebase config + auth exports
@@ -120,13 +163,13 @@ npm run preview   # preview the production build
 ├── ---test---/                   # Jest test files
 ├── wireframes.md                 # UI wireframes
 ├── database_schema.md            # Database schema docs
-└── vercel.json                   # Vercel deployment config
+└── vercel.json                   # Vercel deployment config + rewrites
 ```
 
 ## Database Schema
 
-Three tables — **Users**, **Files**, and **File_Versions** — track uploaded files and their version history (drafts/undo). See [database_schema.md](database_schema.md) for full details.
+Four tables — **Users**, **Files**, **File_Versions**, and **Graphs** — track users, uploaded files, version history (drafts/undo), and chart images. Tables auto-create on first request via `ensureTables()`. See [database_schema.md](database_schema.md) for full details.
 
 ## Flow
 
-**Login** (Google sign-in) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** → Results banner + functions unlock → Apply functions → View drafts and undo changes.
+**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → Apply functions (column picker or multi-column modal) → Inspect **Empty Values** → View drafts and undo changes → **Export** as XLSX.
