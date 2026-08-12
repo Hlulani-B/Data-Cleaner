@@ -1,6 +1,8 @@
 # Data-Cleaner
 An interactive, browser-based data scrubbing and visualization workspace.
 
+
+A full-stack web application for cleaning and processing CSV/XLSX files. Sign in with Google, upload a spreadsheet, run an automatic initial clean, then apply individual cleaning functions — with undo, draft history, and Neon database persistence.
 ## Why I Built This
 
 Data preparation is notoriously inefficient. When faced with an unrefined dataset, analysts and software engineers generally face three suboptimal choices:
@@ -16,13 +18,19 @@ Enterprise ETL Platforms: Commercial data-wrangling software carries steep licen
 Data-Cleaner bridge this gap by offering a responsive, browser-based workspace that combines the speed and deterministic execution of programmatic cleaning with an intuitive, code-free interface. It empowers users to inspect, execute batch transformations, and visualize datasets seamlessly within a single workflow.
 
 
+##  What This Project Taught Me
+
+Building a complex, browser-based ETL workspace with over 40+ transformation utilities completely shifted my engineering perspective:
+
+* **The Imperative of Automated Testing:** When managing dozens of state-mutating functions, manual testing becomes a massive bottleneck. Writing unit tests for pure data functions proved essential for refactoring with confidence, catching boundary edge cases (`null` checks, regex escaping, string coercion), and preventing regressions.
+* **Designing for High-Friction Workflows:** Real-world data is dirty and unpredictable. Giving users deterministic, instant feedback via live previews and search-by-intent search bars creates a far more reliable experience than relying solely on pure AI auto-cleaning.
 
 
 
 
 
 
-A full-stack web application for cleaning and processing CSV/XLSX files. Sign in with Google, upload a spreadsheet, run an automatic initial clean, then apply individual cleaning functions — with undo, draft history, and Neon database persistence.
+
 
 ## Features
 
