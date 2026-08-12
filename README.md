@@ -49,32 +49,89 @@ Bundled into one action that must be run before other functions unlock. **Persis
 Results are shown in a dismissible banner with row counts and stats.
 
 ### User-Selected Functions
-Applied individually after the initial clean. Some require a column or multi-column selection:
+Applied individually after the initial clean. Some require a column or multi-column selection.
 
-#### Single Column
-- **Lowercase / Uppercase / Proper Case** — convert text case
+#### Row Operations
+- **Remove Empty Rows** — delete rows where every cell is empty
+- **Remove Duplicates** — delete exact duplicate rows
+- **Search Rows** — filter rows by a keyword across all columns
+- **Sample Rows** — keep a random or first-N sample of rows
+- **Reorder Columns** — rearrange column order
+- **Filter Rows** — keep rows that match a condition (equals, greater than, less than, contains)
+- **Sort Rows** — sort by one or more columns, ascending or descending
+
+#### Column Operations
 - **Remove Column** — drop a column from the dataset
-- **Remove Empty Rows** — remove rows where all values are empty
-- **Date Standardization** — reformat a date column (YYYY-MM-DD, MM/DD/YYYY, DD-MM-YYYY)
+- **Rename Column** — change a column header
+- **Duplicate Column** — copy a column to a new column
 - **Type Conversion** — cast a column to number, string, or boolean
-- **Separate Column** — split one column into two by a delimiter and occurrence position
-- **Get Values** — extract unique values from a column; replace exact values; rewrite cell substrings
-- **Replace** — find and replace cell values across a column
+- **Label Encode** — convert categorical text to integer labels
+- **One-Hot Encode** — convert categories to true/false indicator columns
 
-#### Multi-Column
-- **Join Columns** — combine multiple columns into one with a custom delimiter
-- **Concatenate Columns** — combine multiple columns into one, with an optional custom string appended
+#### Text Case
+- **Lowercase** — convert text to lowercase
+- **Uppercase** — convert text to uppercase
+- **Proper Case** — capitalize every word (Title Case)
+- **Sentence Case** — capitalize the first letter of each cell
 
-#### Math Operations
-21 mathematical and statistical operations accessible via a single "Math Operations" card with a two-step modal (pick operation → configure columns/params):
+#### Find, Replace & Extract
+- **Remove Special Characters** — strip symbols and punctuation
+- **Remove Numbers** — strip digits from text
+- **Collapse Whitespace** — normalize multiple spaces into one
+- **Reverse Text** — reverse the characters in each cell
+- **Replace Value** — replace an exact cell value with another
+- **Rewrite (Substring)** — replace a substring anywhere inside a cell
+- **Replace Text** — find and replace text across a column
+- **Separate Column** — split one column into two by a delimiter
+- **Truncate** — limit text to N characters
+- **Pad Left** — pad text on the left to a fixed width
+- **Pad Right** — pad text on the right to a fixed width
+- **Extract Substring** — copy a slice of text to a new column
 
-**Single-column (in-place):** Absolute Value, Ceiling, Floor, Negate, Round (with decimal places), Add Constant, Multiply Constant
+#### Text Analysis
+- **Count Characters** — add a column with character counts
+- **Count Words** — add a column with word counts
+- **Contains** — add a true/false column for substring matches
+- **Starts With** — add a true/false column for prefix matches
+- **Ends With** — add a true/false column for suffix matches
+- **Regex Extract** — extract text matching a regex pattern
+- **Regex Replace** — replace text matching a regex pattern
 
-**Single-column (new column):** Square Root, Power (with exponent), Logarithm (with base), Cumulative Sum
+#### Combine & Split
+- **Join Columns** — combine multiple columns with a custom delimiter
+- **Concatenate Columns** — combine multiple columns without a delimiter
 
-**Two-column (new column):** Add, Subtract, Multiply, Divide, Modulo, Min, Max, Percentage Of, Percentage Change
+#### Math
+- **Math Operations** — 21 arithmetic/statistical operations via a two-step modal
+  - *Single-column in-place:* Absolute Value, Ceiling, Floor, Negate, Round, Add Constant, Multiply Constant
+  - *Single-column new column:* Square Root, Power, Logarithm, Cumulative Sum
+  - *Two-column new column:* Add, Subtract, Multiply, Divide, Modulo, Min, Max, Percentage Of, Percentage Change
+  - *Multi-column new column:* Sum Columns, Average Columns
+- **Absolute Value** — convert numbers to their absolute value
 
-**Multi-column (new column):** Sum Columns, Average Columns
+#### Date Operations
+- **Date Standardize** — reformat dates to a consistent format
+- **Extract Year** — pull the year into a new column
+- **Extract Month** — pull the month into a new column
+- **Extract Day** — pull the day of month into a new column
+- **Extract Weekday** — pull the weekday name into a new column
+- **Add Days** — add or subtract days from a date column
+- **Age from Date** — calculate age from a birthdate column
+- **Is Weekend** — add a true/false weekend column
+- **Date Difference** — compute days/hours/minutes between two date columns
+
+#### Format & Validate
+- **Currency Format** — format numbers as currency
+- **Percentage Format** — format numbers as percentages
+- **Email Valid** — add true/false email validation column
+- **Phone Valid** — add true/false phone validation column
+- **Flag Outliers** — mark numeric outliers using standard deviation
+
+#### Values Panel
+- **Get Unique Values** — list distinct values from a column
+- **Replace Value** — replace exact cell values across the sheet
+- **Rewrite (Substring)** — replace substrings across the sheet
+- **Remove Row by Value** — delete rows where a column equals a value
 
 ### Empty Values Inspector
 Interactive view to inspect and remove rows with empty/missing data:
@@ -83,10 +140,11 @@ Interactive view to inspect and remove rows with empty/missing data:
 - Batch actions: select all empty rows, select fully empty rows only, remove selected or all
 
 ### Search
-- **Search Bar** — sits at the top of every sheet view; filters rows in real time by typing any keyword
-- Case-insensitive, searches across all columns simultaneously
-- Matching cells are highlighted; a live row count shows how many rows match
-- Resets automatically when switching sheets
+- **Data Search Bar** — sits at the top of every sheet view; filters rows in real time by typing any keyword
+  - Case-insensitive, searches across all columns simultaneously
+  - Matching cells are highlighted; a live row count shows how many rows match
+  - Resets automatically when switching sheets
+- **Function Search Bar** — describe what you want in plain English (e.g. "remove repetition") and click **Search**; the AI interprets your intent and highlights the matching function cards
 
 ### Other
 - **Neon Database Persistence** — files are saved to Neon Postgres on upload, synced on every operation, and loaded from Neon when revisiting
@@ -101,7 +159,7 @@ Interactive view to inspect and remove rows with empty/missing data:
 |--------------|----------------------------------------------------|
 | Frontend     | React 19, React Router 7, Vite 8                  |
 | Auth         | Firebase Authentication (Google Sign-In)           |
-| Backend      | Vercel serverless (4 functions) + Express dev server |
+| Backend      | Vercel serverless (5 functions) + Express dev server |
 | Database     | Neon Postgres (`@neondatabase/serverless`)         |
 | Spreadsheets | xlsx (client-side parsing and export)              |
 | AI           | OpenAI, Hugging Face, Google Gemini, Cerebras, Groq |
@@ -158,7 +216,7 @@ npm run dev:client
 npm test
 ```
 
-190 tests across 20 suites covering all automatic and user-choice functions.
+243 tests across 22 suites covering all automatic and user-choice functions.
 
 ## Build
 
@@ -169,16 +227,17 @@ npm run preview   # preview the production build
 
 ## Architecture
 
-### Serverless Functions (4 total — Vercel free-tier compatible)
+### Serverless Functions (5 total — Vercel free-tier compatible)
 
 Vercel's free tier allows **12 serverless functions max**. Early in development, each cleaning operation was its own serverless function (18 total), which exceeded the limit. The solution: consolidate all data transforms into a single unified handler (`api/operations.js`) that dispatches based on the `operation` field. Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites.
 
-| Endpoint              | Handles                                           |
-|-----------------------|---------------------------------------------------|
-| `api/operations.js`   | All data transforms + 21 math operations (upper, lower, proper, clean, trim, duplicates, removeEmpty, removeColumn, missingValues, dateStandard, typeConversion, separate, join, concatenate, datatype, upload, math, absolute) |
-| `api/files.js`        | File CRUD in Neon Postgres (save, list, get, update, delete, versions) |
-| `api/auth.js`         | User registration in Neon Postgres                |
-| `api/ai.js`           | Multi-provider AI orchestration                   |
+| Endpoint                | Handles                                           |
+|-------------------------|---------------------------------------------------|
+| `api/operations.js`     | All data transforms + 21 math operations (upper, lower, proper, clean, trim, duplicates, removeEmpty, removeColumn, missingValues, dateStandard, typeConversion, separate, join, concatenate, datatype, upload, math, absolute) |
+| `api/files.js`          | File CRUD in Neon Postgres (save, list, get, update, delete, versions) |
+| `api/auth.js`           | User registration in Neon Postgres                |
+| `api/ai.js`             | Multi-provider AI orchestration                   |
+| `api/interpret.js`      | Natural-language function search interpretation   |
 
 Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites. The operations handler auto-detects the operation from the URL path or the `operation` field in the request body.
 
@@ -202,7 +261,8 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 │   ├── operations.js             # Unified handler for all data + math transforms
 │   ├── files.js                  # File CRUD (save/list/get/update/delete/versions)
 │   ├── auth.js                   # User registration endpoint
-│   └── ai.js                     # Multi-provider AI orchestration
+│   ├── ai.js                     # Multi-provider AI orchestration
+│   └── interpret.js              # Natural-language function search interpretation
 ├── server/
 │   └── index.js                  # Express dev server (API + Vite middleware)
 ├── src/
@@ -230,4 +290,4 @@ Four tables — **Users**, **Files**, **File_Versions**, and **Graphs** — trac
 
 **Flow**
 
-**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → **Search** rows in real time via the search bar → Apply functions (column picker or multi-column modal) → Inspect **Empty Values** → View drafts and undo changes → **Export** as XLSX.
+**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → **Search** rows in real time via the data search bar, or **describe what you want** in the function search bar → Apply functions (column picker or multi-column modal) → Inspect **Empty Values** → View drafts and undo changes → **Export** as XLSX.
