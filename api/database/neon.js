@@ -40,13 +40,31 @@ export class Database {
       )
     `;
 
-    // Migration: ensure file_path columns are TEXT (not VARCHAR(500))
-    try {
-      await sql`ALTER TABLE Files ALTER COLUMN file_path TYPE TEXT`;
-    } catch {}
-    try {
-      await sql`ALTER TABLE File_Versions ALTER COLUMN file_path TYPE TEXT`;
-    } catch {}
+    // ─── Migrations: fix tables that were created with an older schema ───
+
+    // Ensure file_path columns are TEXT (not VARCHAR(500))
+    try { await sql`ALTER TABLE Files ALTER COLUMN file_path TYPE TEXT`; } catch {}
+    try { await sql`ALTER TABLE File_Versions ALTER COLUMN file_path TYPE TEXT`; } catch {}
+
+    // Handle old user_email column — rename to "user" or drop NOT NULL
+    try { await sql`ALTER TABLE Files ALTER COLUMN user_email DROP NOT NULL`; } catch {}
+    try { await sql`ALTER TABLE File_Versions ALTER COLUMN user_email DROP NOT NULL`; } catch {}
+    try { await sql`ALTER TABLE Files RENAME COLUMN user_email TO "user"`; } catch {}
+    try { await sql`ALTER TABLE File_Versions RENAME COLUMN user_email TO "user"`; } catch {}
+
+    // Add missing columns to Files (if not created by CREATE TABLE or rename)
+    try { await sql`ALTER TABLE Files ADD COLUMN "user" VARCHAR(255) REFERENCES Users(email)`; } catch {}
+    try { await sql`ALTER TABLE Files ADD COLUMN filename VARCHAR(255) NOT NULL DEFAULT ''`; } catch {}
+    try { await sql`ALTER TABLE Files ADD COLUMN filetype VARCHAR(10) NOT NULL DEFAULT 'csv'`; } catch {}
+    try { await sql`ALTER TABLE Files ADD COLUMN file_path TEXT NOT NULL DEFAULT ''`; } catch {}
+
+    // Add missing columns to File_Versions
+    try { await sql`ALTER TABLE File_Versions ADD COLUMN "user" VARCHAR(255) REFERENCES Users(email)`; } catch {}
+    try { await sql`ALTER TABLE File_Versions ADD COLUMN file_id INTEGER REFERENCES Files(id)`; } catch {}
+    try { await sql`ALTER TABLE File_Versions ADD COLUMN position INTEGER NOT NULL DEFAULT 0`; } catch {}
+    try { await sql`ALTER TABLE File_Versions ADD COLUMN filename VARCHAR(255) NOT NULL DEFAULT ''`; } catch {}
+    try { await sql`ALTER TABLE File_Versions ADD COLUMN filetype VARCHAR(10) NOT NULL DEFAULT 'csv'`; } catch {}
+    try { await sql`ALTER TABLE File_Versions ADD COLUMN file_path TEXT NOT NULL DEFAULT ''`; } catch {}
   }
 
   // Update file content
