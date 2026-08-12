@@ -654,6 +654,156 @@
   background: rgba(59, 130, 246, 0.15);
 }
 
+/* ─── Values Panel ─── */
+.values-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  margin-top: 8px;
+}
+
+.values-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mode-chip {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--bg, #f9fafb);
+  color: var(--text, #111827);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.mode-chip:hover {
+  background: var(--hover-bg, #f3f4f6);
+}
+
+.mode-chip.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.mode-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.values-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.values-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 160px;
+}
+
+.values-controls select,
+.values-controls input {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #d1d5db);
+  background: var(--card-bg, #fff);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.values-message {
+  margin: 0;
+  font-size: 13px;
+  color: #166534;
+}
+
+.values-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.values-result strong {
+  font-size: 14px;
+}
+
+.values-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.value-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.value-badge.empty {
+  background: rgba(107, 114, 128, 0.12);
+  color: #4b5563;
+  font-style: italic;
+}
+
+@media (prefers-color-scheme: dark) {
+  .values-panel {
+    background: var(--card-bg, #1f2937);
+    border-color: var(--border, #374151);
+  }
+
+  .mode-chip {
+    background: var(--bg, #374151);
+    border-color: var(--border, #4b5563);
+    color: var(--text, #f9fafb);
+  }
+
+  .mode-chip:hover {
+    background: var(--hover-bg, #4b5563);
+  }
+
+  .mode-chip.active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+  }
+
+  .values-controls select,
+  .values-controls input {
+    background: var(--card-bg, #1f2937);
+    border-color: var(--border, #4b5563);
+    color: var(--text, #f9fafb);
+  }
+
+  .value-badge {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+  }
+
+  .value-badge.empty {
+    background: rgba(156, 163, 175, 0.15);
+    color: #d1d5db;
+  }
+}
+
 /* ─── Initial Clean Gate ─── */
 .gate-section {
   display: flex;
