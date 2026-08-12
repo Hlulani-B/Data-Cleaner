@@ -32,4 +32,9 @@ export class Values {
         });
         return XLSX.utils.json_to_sheet(data);
     }
+    removeRowWithValue(sheet, column, value) {
+        const data = XLSX.utils.sheet_to_json(sheet);
+        const filtered = data.filter((row) => row[column] != value);
+        return XLSX.utils.json_to_sheet(filtered);
+    }
 }

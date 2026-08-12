@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
+import { Values } from "../functions/user_choice/getValues";
 import {
   trimData, cleanData, removeDuplicates, detectDatatypes,
   removeEmptyRows, lowercaseColumn, uppercaseColumn, properCaseColumn,
@@ -10,6 +11,8 @@ import {
   mathSingleInPlace, mathSingleNewCol, mathCumulativeSum,
   mathTwoColumn, mathSumColumns, mathAverageColumns,
 } from "../utils/cleaners";
+
+const valuesOps = new Values();
 
 /* ─── Client-side function runners ─── */
 const FUNCTION_RUNNERS = {
@@ -32,6 +35,25 @@ const FUNCTION_RUNNERS = {
     data, (extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : []), extra?.newColumn || "concatenated", extra?.customString || ""
   ),
   math: (data, _col, extra) => runMathOp(data, extra?.mathOp, extra),
+  // Values operations (operate on a sheet-converted copy)
+  getValues: (data, col) => {
+    const sheet = XLSX.utils.json_to_sheet(data);
+    const unique = valuesOps.getValues(sheet, col);
+    // Return data unchanged — result shown as an alert/info
+    return { __getValuesResult: unique, data };
+  },
+  replaceValues: (data, col, extra) => {
+    const sheet = XLSX.utils.json_to_sheet(data);
+    return XLSX.utils.sheet_to_json(valuesOps.replaceValues(sheet, col, extra.findValue ?? "", extra.replaceWith ?? ""), { defval: "" });
+  },
+  rewrite: (data, col, extra) => {
+    const sheet = XLSX.utils.json_to_sheet(data);
+    return XLSX.utils.sheet_to_json(valuesOps.rewrite(sheet, col, extra.findValue ?? "", extra.replaceWith ?? ""), { defval: "" });
+  },
+  removeRowWithValue: (data, col, extra) => {
+    const sheet = XLSX.utils.json_to_sheet(data);
+    return XLSX.utils.sheet_to_json(valuesOps.removeRowWithValue(sheet, col, extra.findValue ?? ""), { defval: "" });
+  },
 };
 
 /* ─── Math Operations Catalogue ─── */
@@ -108,6 +130,11 @@ const FUNCTIONS = [
   { key: "join", label: "Join Columns", desc: "Combine multiple columns with a delimiter", needsColumn: false, multiColumn: true },
   { key: "concatenate", label: "Concatenate Columns", desc: "Combine multiple columns without a delimiter", needsColumn: false, multiColumn: true },
   { key: "math", label: "Math Operations", desc: "Arithmetic, rounding, absolute, and more", needsColumn: false, isMath: true },
+  // Values
+  { key: "getValues", label: "Get Unique Values", desc: "Show all unique values in a column", needsColumn: true, isGetValues: true },
+  { key: "replaceValues", label: "Replace Value", desc: "Replace exact cell value with another value", needsColumn: true, needsValueParams: true },
+  { key: "rewrite", label: "Rewrite (Substring)", desc: "Replace a substring within cell values", needsColumn: true, needsValueParams: true },
+  { key: "removeRowWithValue", label: "Remove Row by Value", desc: "Delete all rows where a column equals a value", needsColumn: true, needsRemoveValue: true },
 ];
 
 /* ─── Shared FileView component (used by both Excel and CSV) ─── */
@@ -125,6 +152,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [showEmptyValues, setShowEmptyValues] = useState(false); // toggle empty values inspector
   const [mathModal, setMathModal] = useState(null); // { step: 'pick'|'config', mathOp, mathDef }
   const [searchQuery, setSearchQuery] = useState(""); // search bar filter
+  const [getValuesResult, setGetValuesResult] = useState(null); // { column, values[] }
 
   // Load sheet data when sheet changes
   useEffect(() => {
@@ -257,9 +285,17 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       pushHistory();
       const runner = FUNCTION_RUNNERS[funcDef.key];
       if (!runner) throw new Error(`Unknown function: ${funcDef.key}`);
-      const newData = funcDef.needsColumn ? runner(data, column, extra) : runner(data, null, extra);
-      setData(newData);
-      persistFile(newData);
+      const result = funcDef.needsColumn ? runner(data, column, extra) : runner(data, null, extra);
+      // getValues returns a special object — show result without modifying data
+      if (result && result.__getValuesResult) {
+        setHistory((prev) => prev.slice(0, -1)); // undo the premature history push
+        const unique = result.__getValuesResult;
+        setGetValuesResult({ column, values: unique });
+        setColumnPicker(null);
+        return;
+      }
+      setData(result);
+      persistFile(result);
       saveDraft(funcDef.label + (column ? ` (${column})` : ""));
       setColumnPicker(null);
       setExtraParams({});
@@ -618,7 +654,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                       className="column-chip"
                       onClick={() => {
                         const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
-                        if (fn.key === "separate") {
+                        if (fn.key === "separate" || fn.needsValueParams || fn.needsRemoveValue) {
                           // Open extra params instead of applying immediately
                           setColumnPicker((prev) => ({ ...prev, selectedColumn: col, showParams: true }));
                         } else {
@@ -706,6 +742,68 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                   className="primary-btn modal-apply-btn"
                   onClick={() => {
                     const fn = FUNCTIONS.find((f) => f.key === "separate");
+                    applyFunction(fn, columnPicker.selectedColumn, extraParams);
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+
+            {/* Replace Value / Rewrite extra params */}
+            {(columnPicker.funcKey === "replaceValues" || columnPicker.funcKey === "rewrite") && columnPicker.selectedColumn && (
+              <div className="extra-params">
+                <p className="modal-hint">
+                  {columnPicker.funcKey === "rewrite" ? "Substring to find:" : "Value to find:"}
+                </p>
+                <label>
+                  Find:
+                  <input
+                    type="text"
+                    value={extraParams.findValue ?? ""}
+                    onChange={(e) => setExtraParams({ ...extraParams, findValue: e.target.value })}
+                    placeholder="Value to find"
+                  />
+                </label>
+                <label>
+                  Replace with:
+                  <input
+                    type="text"
+                    value={extraParams.replaceWith ?? ""}
+                    onChange={(e) => setExtraParams({ ...extraParams, replaceWith: e.target.value })}
+                    placeholder="Replacement value"
+                  />
+                </label>
+                <button
+                  className="primary-btn modal-apply-btn"
+                  disabled={!extraParams.findValue}
+                  onClick={() => {
+                    const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
+                    applyFunction(fn, columnPicker.selectedColumn, extraParams);
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+
+            {/* Remove Row by Value extra params */}
+            {columnPicker.funcKey === "removeRowWithValue" && columnPicker.selectedColumn && (
+              <div className="extra-params">
+                <label>
+                  Remove rows where <strong>{columnPicker.selectedColumn}</strong> equals:
+                  <input
+                    type="text"
+                    value={extraParams.findValue ?? ""}
+                    onChange={(e) => setExtraParams({ ...extraParams, findValue: e.target.value })}
+                    placeholder="Value to match"
+                  />
+                </label>
+                <button
+                  className="primary-btn modal-apply-btn"
+                  disabled={extraParams.findValue === undefined || extraParams.findValue === ""}
+                  onClick={() => {
+                    const fn = FUNCTIONS.find((f) => f.key === "removeRowWithValue");
                     applyFunction(fn, columnPicker.selectedColumn, extraParams);
                   }}
                 >
