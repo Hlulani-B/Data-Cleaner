@@ -8,7 +8,7 @@ class Concatenate {
             let value = "";
             array.forEach((col) => {
                 if (Object.keys(row).includes(col)) {
-                    value += row[col];
+                    value += String(row[col] ?? "");
                 } else {
                     value += col;
                 }

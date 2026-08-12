@@ -24,10 +24,10 @@ const FUNCTION_RUNNERS = {
     extra.newColumn1 || `${col}_1`, extra.newColumn2 || `${col}_2`
   ),
   join: (data, _col, extra) => joinColumns(
-    data, extra.selectedColumns || [], extra.newColumn || "joined", extra.delimiter || " "
+    data, (extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : []), extra?.newColumn || "joined", extra?.delimiter || " "
   ),
   concatenate: (data, _col, extra) => concatenateColumns(
-    data, extra.selectedColumns || [], extra.newColumn || "concatenated", extra.customString || ""
+    data, (extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : []), extra?.newColumn || "concatenated", extra?.customString || ""
   ),
 };
 
@@ -200,6 +200,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
 
   /* ─── Handle function card click ─── */
   const handleFuncClick = (funcDef) => {
+    setExtraParams({});
     if (funcDef.multiColumn) {
       setColumnPicker({ funcKey: funcDef.key, label: funcDef.label, multiColumn: true });
       setMultiColumns([]);

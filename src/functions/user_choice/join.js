@@ -6,7 +6,7 @@ class Join {
 
         data.forEach((row) => {
             const value = array
-                .map((col) => (Object.keys(row).includes(col) ? row[col] : ""))
+                .map((col) => (Object.keys(row).includes(col) ? String(row[col] ?? "") : ""))
                 .join(delimeter);
             row[new_column] = value;
         });
