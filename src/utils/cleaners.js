@@ -18,21 +18,31 @@ export function trimData(data) {
   });
 }
 
-/** Clean: remove fully-empty rows, trim strings, empty string → null */
+/** Clean: trim strings, remove fully-empty rows, empty string → null */
 export function cleanData(data) {
   if (data.length === 0) return data;
-  const filtered = data.filter((row) =>
-    Object.values(row).some((v) => v !== undefined && v !== null && v !== "")
-  );
-  if (filtered.length === 0) return filtered;
-  const columns = Object.keys(filtered[0]);
-  return filtered.map((row) => {
+
+  // 1. Trim every string value (but don't convert to null yet).
+  const trimmed = data.map((row) => {
     const out = { ...row };
-    for (const col of columns) {
+    for (const col of Object.keys(out)) {
       if (typeof out[col] === "string") {
         out[col] = out[col].trim();
-        if (out[col] === "") out[col] = null;
       }
+    }
+    return out;
+  });
+
+  // 2. Drop rows that are completely empty after trimming.
+  const filtered = trimmed.filter((row) =>
+    Object.values(row).some((v) => v !== undefined && v !== null && v !== "")
+  );
+
+  // 3. Convert any remaining empty strings to null.
+  return filtered.map((row) => {
+    const out = { ...row };
+    for (const col of Object.keys(out)) {
+      if (out[col] === "") out[col] = null;
     }
     return out;
   });

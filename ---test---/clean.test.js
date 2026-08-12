@@ -1,4 +1,5 @@
 import { Clean } from '../src/functions/automatic/clean';
+import { cleanData } from '../src/utils/cleaners';
 import XLSX from 'xlsx';
 
 test('removes fully empty rows', () => {
@@ -96,4 +97,62 @@ test('multiple columns cleaned and empty rows removed', () => {
     { name: 'Sam', city: 'NYC' },
     { name: 'Alex', city: 'LA' }
   ]);
+});
+
+test('removes rows that are only whitespace after trimming', () => {
+  const data = [
+    { name: 'Sam' },
+    { name: '   ' },
+    { name: 'Alex' }
+  ];
+  const sheet = XLSX.utils.json_to_sheet(data);
+
+  const clean = new Clean();
+  const result = XLSX.utils.sheet_to_json(clean.clean(sheet));
+
+  expect(result).toEqual([
+    { name: 'Sam' },
+    { name: 'Alex' }
+  ]);
+});
+
+describe('cleanData (client-side mirror)', () => {
+  test('removes fully empty rows', () => {
+    const data = [
+      { name: 'Sam', age: 25 },
+      { name: '', age: '' },
+      { name: 'Alex', age: 30 }
+    ];
+    expect(cleanData(data)).toEqual([
+      { name: 'Sam', age: 25 },
+      { name: 'Alex', age: 30 }
+    ]);
+  });
+
+  test('trims whitespace and converts empties to null', () => {
+    const data = [
+      { name: '  Sam  ', city: '   ' },
+      { name: 'Alex', city: 'LA' }
+    ];
+    expect(cleanData(data)).toEqual([
+      { name: 'Sam', city: null },
+      { name: 'Alex', city: 'LA' }
+    ]);
+  });
+
+  test('removes rows that are only whitespace after trimming', () => {
+    const data = [
+      { name: 'Sam' },
+      { name: '   ' },
+      { name: 'Alex' }
+    ];
+    expect(cleanData(data)).toEqual([
+      { name: 'Sam' },
+      { name: 'Alex' }
+    ]);
+  });
+
+  test('leaves numbers untouched', () => {
+    expect(cleanData([{ age: 25 }, { age: '' }])).toEqual([{ age: 25 }]);
+  });
 });

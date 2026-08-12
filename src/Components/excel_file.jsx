@@ -378,7 +378,6 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
 
     const beforeRows = current.length;
     current = trimData(current);
-    const afterTrim = current.length;
     current = cleanData(current);
     const afterClean = current.length;
     current = removeDuplicates(current);
@@ -386,8 +385,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     current = detectDatatypes(current);
 
     const duplicatesRemoved = afterClean - afterDedup;
-    const emptyRowsRemoved = beforeRows - afterTrim;
-    const nullsCleaned = afterTrim - afterClean;
+    const emptyRowsRemoved = beforeRows - afterClean;
 
     setData(current);
     persistFile(current);
@@ -405,7 +403,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     setCleanStats({
       rowsBefore: beforeRows,
       rowsAfter: current.length,
-      emptyRowsRemoved: emptyRowsRemoved + nullsCleaned,
+      emptyRowsRemoved,
       duplicatesRemoved,
     });
   };

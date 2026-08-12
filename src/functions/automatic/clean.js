@@ -5,22 +5,29 @@ export class Clean{
         const data = XLSX.utils.sheet_to_json(sheet);
         if(data.length === 0) return sheet;
 
-        // Remove rows where all values are null, undefined, or empty string
-        const cleaned = data.filter(row => {
+        // 1. Trim every string value (but don't convert to null yet).
+        const trimmed = data.map(row => {
+            const out = { ...row };
+            for(const col of Object.keys(out)){
+                if(typeof out[col] === "string"){
+                    out[col] = out[col].trim();
+                }
+            }
+            return out;
+        });
+
+        // 2. Remove rows where all values are null, undefined, or empty string after trimming.
+        const cleaned = trimmed.filter(row => {
             const values = Object.values(row);
             return values.some(val =>
                 val !== undefined && val !== null && val !== ""
             );
         });
 
-        // Trim string values and convert empty strings to null
-        const columns = Object.keys(cleaned[0] || {});
-        columns.forEach((col) => {
-            for(let row of cleaned){
-                if(typeof row[col] === "string"){
-                    row[col] = row[col].trim();
-                    if(row[col] === "") row[col] = null;
-                }
+        // 3. Convert any remaining empty strings to null.
+        cleaned.forEach((row) => {
+            for(const col of Object.keys(row)){
+                if(row[col] === "") row[col] = null;
             }
         });
 
