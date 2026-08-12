@@ -124,6 +124,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [multiColumns, setMultiColumns] = useState([]); // for join / concatenate multi-column selection
   const [showEmptyValues, setShowEmptyValues] = useState(false); // toggle empty values inspector
   const [mathModal, setMathModal] = useState(null); // { step: 'pick'|'config', mathOp, mathDef }
+  const [searchQuery, setSearchQuery] = useState(""); // search bar filter
 
   // Load sheet data when sheet changes
   useEffect(() => {
@@ -141,6 +142,19 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   }, [file, activeSheet]);
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
+
+  // Filtered data based on search query
+  const filteredData = searchQuery.trim()
+    ? data.filter((row) => {
+        const term = searchQuery.toLowerCase();
+        return Object.values(row).some((val) =>
+          String(val ?? "").toLowerCase().includes(term)
+        );
+      })
+    : data;
+
+  // Reset search when sheet changes
+  useEffect(() => { setSearchQuery(""); }, [activeSheet]);
 
   // Save current file state back to localStorage + Neon
   const persistFile = useCallback(
@@ -339,6 +353,30 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
             </div>
           )}
 
+          {/* Search Bar */}
+          {data.length > 0 && (
+            <div className="search-bar">
+              <span className="search-icon">&#128269;</span>
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search all columns..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <>
+                  <span className="search-count">
+                    {filteredData.length} of {data.length} rows
+                  </span>
+                  <button className="search-clear" onClick={() => setSearchQuery("")} title="Clear search">
+                    &times;
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Data Table / Empty Values Inspector */}
           {showEmptyValues ? (
             <EmptyValues
@@ -353,7 +391,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
             />
           ) : (
             <div className="table-wrap">
-              {data.length > 0 ? (
+              {filteredData.length > 0 ? (
                 <table className="data-table">
                   <thead>
                     <tr>
@@ -363,20 +401,26 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                     </tr>
                   </thead>
                   <tbody>
-                    {data.slice(0, 10).map((row, i) => (
+                    {filteredData.slice(0, 50).map((row, i) => (
                       <tr key={i}>
-                        {columns.map((col) => (
-                          <td key={col}>{row[col] != null ? String(row[col]) : ""}</td>
-                        ))}
+                        {columns.map((col) => {
+                          const cellVal = row[col] != null ? String(row[col]) : "";
+                          const isMatch = searchQuery.trim() && cellVal.toLowerCase().includes(searchQuery.toLowerCase());
+                          return (
+                            <td key={col} className={isMatch ? "search-highlight" : ""}>
+                              {cellVal}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="empty-msg">No data to display</p>
+                <p className="empty-msg">{searchQuery ? "No rows match your search" : "No data to display"}</p>
               )}
-              {data.length > 10 && (
-                <p className="truncation-note">Showing first 10 of {data.length} rows</p>
+              {filteredData.length > 50 && (
+                <p className="truncation-note">Showing first 50 of {filteredData.length} rows{searchQuery ? ` (${data.length} total)` : ""}</p>
               )}
             </div>
           )}
