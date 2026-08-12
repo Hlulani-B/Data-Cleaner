@@ -397,8 +397,22 @@ function scoreFunctionMatch(fn, query) {
 }
 
 /** Filter categories to only those with matching functions. */
-function filterFunctionCategories(query) {
+function filterFunctionCategories(query, aiKeys = []) {
   if (!query.trim()) return FUNCTION_CATEGORIES;
+
+  // If AI has returned interpreted keys, show only those functions in the returned order.
+  if (aiKeys.length > 0) {
+    return FUNCTION_CATEGORIES
+      .map((cat) => ({
+        ...cat,
+        items: aiKeys
+          .map((key) => cat.items.find((fn) => fn.key === key))
+          .filter(Boolean),
+      }))
+      .filter((cat) => cat.items.length > 0);
+  }
+
+  // Fallback: local keyword / description matching.
   return FUNCTION_CATEGORIES
     .map((cat) => ({
       ...cat,
@@ -423,6 +437,9 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [mathModal, setMathModal] = useState(null); // { step: 'pick'|'config', mathOp, mathDef }
   const [searchQuery, setSearchQuery] = useState(""); // data row search filter
   const [funcSearchQuery, setFuncSearchQuery] = useState(""); // natural-language function search
+  const [aiSearchKeys, setAiSearchKeys] = useState([]); // keys returned by AI interpret endpoint
+  const [aiSearchLoading, setAiSearchLoading] = useState(false); // AI search in progress
+  const [aiSearchError, setAiSearchError] = useState(null); // AI search error message
   const [getValuesResult, setGetValuesResult] = useState(null); // { column, values[] }
 
   // Load sheet data when sheet changes
@@ -547,6 +564,40 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       emptyRowsRemoved,
       duplicatesRemoved,
     });
+  };
+
+  /* ─── AI-powered natural-language function search ─── */
+  const interpretFunctionSearch = async () => {
+    const query = funcSearchQuery.trim();
+    if (!query) {
+      setAiSearchKeys([]);
+      setAiSearchError(null);
+      return;
+    }
+
+    setAiSearchLoading(true);
+    setAiSearchError(null);
+    try {
+      const res = await fetch("/api/interpret", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error ${res.status}`);
+      }
+
+      const { keys } = await res.json();
+      setAiSearchKeys(Array.isArray(keys) ? keys : []);
+    } catch (err) {
+      console.error("AI search failed:", err);
+      setAiSearchError(err.message || "AI search failed");
+      setAiSearchKeys([]);
+    } finally {
+      setAiSearchLoading(false);
+    }
   };
 
   /* ─── Apply a cleaning function (client-side) ─── */
@@ -802,18 +853,40 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                     className="function-search-input"
                     placeholder="Describe what you want, e.g. 'make text uppercase' or 'remove duplicates'"
                     value={funcSearchQuery}
-                    onChange={(e) => setFuncSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setFuncSearchQuery(e.target.value);
+                      setAiSearchKeys([]); // reset AI results while typing
+                      setAiSearchError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") interpretFunctionSearch();
+                    }}
                   />
                   {funcSearchQuery && (
                     <button
                       className="function-search-clear"
-                      onClick={() => setFuncSearchQuery("")}
+                      onClick={() => {
+                        setFuncSearchQuery("");
+                        setAiSearchKeys([]);
+                        setAiSearchError(null);
+                      }}
                       title="Clear search"
                     >
                       &times;
                     </button>
                   )}
+                  <button
+                    className="function-search-btn"
+                    onClick={interpretFunctionSearch}
+                    disabled={aiSearchLoading || !funcSearchQuery.trim()}
+                    title="Search with AI"
+                  >
+                    {aiSearchLoading ? "..." : "Search"}
+                  </button>
                 </div>
+                {aiSearchError && (
+                  <p className="function-search-error">{aiSearchError}</p>
+                )}
 
                 <div className="function-category">
                   <h4 className="category-heading">Inspectors</h4>
@@ -829,7 +902,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                   </div>
                 </div>
 
-                {filterFunctionCategories(funcSearchQuery).map((cat) => (
+                {filterFunctionCategories(funcSearchQuery, aiSearchKeys).map((cat) => (
                   <div key={cat.name} className="function-category">
                     <h4 className="category-heading">{cat.name}</h4>
                     <div className="functions-grid">
@@ -848,7 +921,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                   </div>
                 ))}
 
-                {funcSearchQuery && filterFunctionCategories(funcSearchQuery).length === 0 && (
+                {funcSearchQuery && filterFunctionCategories(funcSearchQuery, aiSearchKeys).length === 0 && (
                   <p className="function-search-empty">No functions match "{funcSearchQuery}"</p>
                 )}
               </section>

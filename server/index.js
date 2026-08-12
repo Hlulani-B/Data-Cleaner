@@ -33,12 +33,23 @@ async function start() {
     console.warn("AI module skipped — missing dependencies:", err.code || err.message);
   }
 
+  let interpret = null;
+  try {
+    const interpretMod = await import("../api/interpret.js");
+    interpret = interpretMod.default;
+  } catch (err) {
+    console.warn("Interpret module skipped — missing dependencies:", err.code || err.message);
+  }
+
   // ─── Primary routes ───
   app.all("/api/operations", (req, res) => operations(req, res));
   app.all("/api/auth", (req, res) => auth(req, res));
   app.all("/api/files", (req, res) => files(req, res));
   if (ai) {
     app.all("/api/ai", (req, res) => ai(req, res));
+  }
+  if (interpret) {
+    app.all("/api/interpret", (req, res) => interpret(req, res));
   }
 
   // ─── Legacy routes → forward to operations (backward compat) ───
