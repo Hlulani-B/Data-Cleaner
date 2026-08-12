@@ -325,6 +325,88 @@ const FUNCTION_CATEGORIES = [
 // Flat alias for any code that still expects a single array.
 const FUNCTIONS = FUNCTION_CATEGORIES.flatMap((cat) => cat.items);
 
+/* ─── Natural-language keywords for function search ─── */
+const FUNCTION_KEYWORDS = {
+  removeEmpty: "empty blank rows delete",
+  duplicates: "duplicate same identical unique",
+  search: "find filter rows keyword text match",
+  sampleRows: "sample random first n rows subset",
+  reorderColumns: "reorder rearrange columns order move",
+  filterRows: "filter rows condition equals greater less than contains",
+  sortRows: "sort order ascending descending alphabet numeric",
+  removeColumn: "remove delete column drop",
+  renameColumn: "rename column name change",
+  duplicateColumn: "duplicate copy column clone",
+  typeConversion: "convert type number string boolean",
+  labelEncode: "label encode category categorical integer",
+  oneHotEncode: "one hot encode dummy binary category",
+  lower: "lowercase lower case small letters",
+  upper: "uppercase upper case capital all caps",
+  proper: "proper case title case capitalize words",
+  sentenceCase: "sentence case capitalize first letter",
+  removeSpecialCharacters: "remove special characters symbols punctuation",
+  removeNumbers: "remove numbers digits",
+  collapseWhitespace: "collapse whitespace spaces trim normalize",
+  reverseText: "reverse text characters backwards",
+  replaceValues: "replace value exact cell match",
+  rewrite: "rewrite replace substring text inside",
+  replace: "replace text substring occurrence",
+  separate: "separate split column delimiter",
+  truncateText: "truncate shorten length characters",
+  padLeft: "pad left leading zeros spaces",
+  padRight: "pad right trailing spaces",
+  extractSubstring: "extract substring slice copy text",
+  countCharacters: "count characters length",
+  countWords: "count words word count",
+  containsCheck: "contains substring check true false",
+  startsWithCheck: "starts with prefix begin",
+  endsWithCheck: "ends with suffix finish",
+  regexExtract: "regex extract pattern match",
+  regexReplace: "regex replace pattern",
+  join: "join columns combine delimiter",
+  concatenate: "concatenate columns combine merge text",
+  math: "math operations arithmetic add subtract multiply divide round",
+  absolute: "absolute value positive abs",
+  dateStandard: "date standardize format normalize",
+  extractYear: "extract year pull",
+  extractMonth: "extract month pull",
+  extractDay: "extract day pull",
+  extractDayOfWeek: "extract weekday day of week pull",
+  addDays: "add days subtract dates",
+  ageFromBirthdate: "age from date birthdate calculate years",
+  isWeekend: "is weekend saturday sunday",
+  dateDifference: "date difference days hours minutes between",
+  currencyFormat: "currency format money dollar euro",
+  percentageFormat: "percentage format percent ratio",
+  emailValidityCheck: "email valid validate check",
+  phoneFormatCheck: "phone valid validate check number",
+  flagOutliers: "flag outliers anomaly detect std dev",
+  getValues: "get unique values distinct list",
+  removeRowWithValue: "remove row value delete rows equals",
+  fillEmpty: "fill empty missing values mean median custom",
+};
+
+/** Score a function by how many query words match its label, desc, and keywords. */
+function scoreFunctionMatch(fn, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return 1;
+  const queryWords = q.split(/\s+/).filter(Boolean);
+  const haystack = `${fn.label} ${fn.desc} ${FUNCTION_KEYWORDS[fn.key] || ""}`.toLowerCase();
+  const matches = queryWords.filter((word) => haystack.includes(word)).length;
+  return matches / queryWords.length;
+}
+
+/** Filter categories to only those with matching functions. */
+function filterFunctionCategories(query) {
+  if (!query.trim()) return FUNCTION_CATEGORIES;
+  return FUNCTION_CATEGORIES
+    .map((cat) => ({
+      ...cat,
+      items: cat.items.filter((fn) => scoreFunctionMatch(fn, query) > 0),
+    }))
+    .filter((cat) => cat.items.length > 0);
+}
+
 /* ─── Shared FileView component (used by both Excel and CSV) ─── */
 export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, onSheetChange }) {
   const [data, setData] = useState([]);
@@ -339,7 +421,8 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [multiColumns, setMultiColumns] = useState([]); // for join / concatenate multi-column selection
   const [showEmptyValues, setShowEmptyValues] = useState(false); // toggle empty values inspector
   const [mathModal, setMathModal] = useState(null); // { step: 'pick'|'config', mathOp, mathDef }
-  const [searchQuery, setSearchQuery] = useState(""); // search bar filter
+  const [searchQuery, setSearchQuery] = useState(""); // data row search filter
+  const [funcSearchQuery, setFuncSearchQuery] = useState(""); // natural-language function search
   const [getValuesResult, setGetValuesResult] = useState(null); // { column, values[] }
 
   // Load sheet data when sheet changes
@@ -711,6 +794,27 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               <section className="functions-section">
                 <h3 className="section-heading">Functions</h3>
 
+                {/* Natural-language function search */}
+                <div className="function-search-bar">
+                  <span className="function-search-icon">&#128269;</span>
+                  <input
+                    type="text"
+                    className="function-search-input"
+                    placeholder="Describe what you want, e.g. 'make text uppercase' or 'remove duplicates'"
+                    value={funcSearchQuery}
+                    onChange={(e) => setFuncSearchQuery(e.target.value)}
+                  />
+                  {funcSearchQuery && (
+                    <button
+                      className="function-search-clear"
+                      onClick={() => setFuncSearchQuery("")}
+                      title="Clear search"
+                    >
+                      &times;
+                    </button>
+                  )}
+                </div>
+
                 <div className="function-category">
                   <h4 className="category-heading">Inspectors</h4>
                   <div className="functions-grid">
@@ -725,7 +829,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                   </div>
                 </div>
 
-                {FUNCTION_CATEGORIES.map((cat) => (
+                {filterFunctionCategories(funcSearchQuery).map((cat) => (
                   <div key={cat.name} className="function-category">
                     <h4 className="category-heading">{cat.name}</h4>
                     <div className="functions-grid">
@@ -743,6 +847,10 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                     </div>
                   </div>
                 ))}
+
+                {funcSearchQuery && filterFunctionCategories(funcSearchQuery).length === 0 && (
+                  <p className="function-search-empty">No functions match "{funcSearchQuery}"</p>
+                )}
               </section>
 
               {/* Values Panel (getValues / replace / rewrite / remove row) */}
