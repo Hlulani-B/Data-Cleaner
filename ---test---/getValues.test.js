@@ -103,3 +103,30 @@ test('rewrite preserves other columns', () => {
   expect(result[0].name).toBe('Sam Smith');
   expect(result[0].age).toBe(30);
 });
+
+// --- removeRowWithValue ---
+
+test('removeRowWithValue removes rows matching value', () => {
+  const data = [{ status: 'active' }, { status: 'inactive' }, { status: 'active' }];
+  const result = XLSX.utils.sheet_to_json(v.removeRowWithValue(makeSheet(data), 'status', 'active'));
+  expect(result).toHaveLength(1);
+  expect(result[0].status).toBe('inactive');
+});
+
+test('removeRowWithValue removes no rows when value not found', () => {
+  const data = [{ x: 'a' }, { x: 'b' }];
+  const result = XLSX.utils.sheet_to_json(v.removeRowWithValue(makeSheet(data), 'x', 'z'));
+  expect(result).toHaveLength(2);
+});
+
+test('removeRowWithValue removes all rows when all match', () => {
+  const data = [{ val: 1 }, { val: 1 }, { val: 1 }];
+  const result = XLSX.utils.sheet_to_json(v.removeRowWithValue(makeSheet(data), 'val', 1));
+  expect(result).toHaveLength(0);
+});
+
+test('removeRowWithValue preserves non-matching rows order', () => {
+  const data = [{ a: 'x' }, { a: 'y' }, { a: 'z' }];
+  const result = XLSX.utils.sheet_to_json(v.removeRowWithValue(makeSheet(data), 'a', 'y'));
+  expect(result.map(r => r.a)).toEqual(['x', 'z']);
+});

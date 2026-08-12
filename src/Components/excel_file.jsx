@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
+import ValuesPanel from "./values";
 import { Values } from "../functions/user_choice/getValues";
 import { Clean } from "../functions/automatic/clean";
 import {
@@ -677,6 +678,18 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                   ))}
                 </div>
               </section>
+
+              {/* Values Panel (getValues / replace / rewrite / remove row) */}
+              <ValuesPanel
+                data={data}
+                columns={columns}
+                onChange={(nextData, summary) => {
+                  pushHistory();
+                  setData(nextData);
+                  persistFile(nextData);
+                  saveDraft(summary || "Values operation");
+                }}
+              />
 
               {/* Drafts */}
               {drafts.length > 0 && (
