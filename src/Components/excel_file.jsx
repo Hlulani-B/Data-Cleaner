@@ -827,6 +827,55 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               <button className="dismiss-btn" onClick={() => setGetValuesResult(null)}>&times;</button>
             </div>
           )}
+
+          {initialCleanDone && (
+            <>
+              <h3 className="section-heading fixed-functions-heading">Functions</h3>
+
+              {/* Natural-language function search */}
+              <div className="function-search-bar">
+                <span className="function-search-icon">&#128269;</span>
+                <input
+                  type="text"
+                  className="function-search-input"
+                  placeholder="Describe what you want, e.g. 'make text uppercase' or 'remove duplicates'"
+                  value={funcSearchQuery}
+                  onChange={(e) => {
+                    setFuncSearchQuery(e.target.value);
+                    setAiSearchKeys([]); // reset AI results while typing
+                    setAiSearchError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") interpretFunctionSearch();
+                  }}
+                />
+                {funcSearchQuery && (
+                  <button
+                    className="function-search-clear"
+                    onClick={() => {
+                      setFuncSearchQuery("");
+                      setAiSearchKeys([]);
+                      setAiSearchError(null);
+                    }}
+                    title="Clear search"
+                  >
+                    &times;
+                  </button>
+                )}
+                <button
+                  className="function-search-btn"
+                  onClick={interpretFunctionSearch}
+                  disabled={aiSearchLoading || !funcSearchQuery.trim()}
+                  title="Search with AI"
+                >
+                  {aiSearchLoading ? "..." : "Search"}
+                </button>
+              </div>
+              {aiSearchError && (
+                <p className="function-search-error">{aiSearchError}</p>
+              )}
+            </>
+          )}
           </div>
 
           {/* Initial Clean Gate */}
@@ -845,51 +894,6 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
             <>
               {/* Functions Grid */}
               <section className="functions-section">
-                <h3 className="section-heading">Functions</h3>
-
-                {/* Natural-language function search */}
-                <div className="function-search-bar">
-                  <span className="function-search-icon">&#128269;</span>
-                  <input
-                    type="text"
-                    className="function-search-input"
-                    placeholder="Describe what you want, e.g. 'make text uppercase' or 'remove duplicates'"
-                    value={funcSearchQuery}
-                    onChange={(e) => {
-                      setFuncSearchQuery(e.target.value);
-                      setAiSearchKeys([]); // reset AI results while typing
-                      setAiSearchError(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") interpretFunctionSearch();
-                    }}
-                  />
-                  {funcSearchQuery && (
-                    <button
-                      className="function-search-clear"
-                      onClick={() => {
-                        setFuncSearchQuery("");
-                        setAiSearchKeys([]);
-                        setAiSearchError(null);
-                      }}
-                      title="Clear search"
-                    >
-                      &times;
-                    </button>
-                  )}
-                  <button
-                    className="function-search-btn"
-                    onClick={interpretFunctionSearch}
-                    disabled={aiSearchLoading || !funcSearchQuery.trim()}
-                    title="Search with AI"
-                  >
-                    {aiSearchLoading ? "..." : "Search"}
-                  </button>
-                </div>
-                {aiSearchError && (
-                  <p className="function-search-error">{aiSearchError}</p>
-                )}
-
                 <div className="function-category">
                   <h4 className="category-heading">Inspectors</h4>
                   <div className="functions-grid">

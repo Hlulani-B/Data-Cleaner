@@ -422,13 +422,14 @@
   gap: 24px;
 }
 
-/* ─── Fixed Data Panel (search + table + result banners) ─── */
+/* ─── Fixed Data Panel (search + table + result banners + function search) ─── */
 .data-panel {
   position: fixed;
   top: 56px; /* below top-nav */
   left: 24px;
   right: 24px;
-  max-height: 42vh;
+  height: 50vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -449,14 +450,14 @@
 .file-content > .gate-section,
 .file-content > .functions-section,
 .file-content > .drafts-section {
-  margin-top: calc(42vh + 24px);
+  margin-top: calc(50vh + 24px);
 }
 
 /* ─── Data Table ─── */
 .table-wrap {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 28vh;
+  max-height: 26vh;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card-bg, var(--bg));
