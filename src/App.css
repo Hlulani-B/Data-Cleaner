@@ -622,6 +622,38 @@
   opacity: 1;
 }
 
+/* ─── Get Unique Values Result Panel ─── */
+.get-values-results {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+@media (prefers-color-scheme: dark) {
+  .get-values-results {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
+  }
+}
+
+.get-values-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
+  width: 100%;
+}
+
+.get-values-list .stat-badge {
+  background: rgba(59, 130, 246, 0.15);
+}
+
 /* ─── Initial Clean Gate ─── */
 .gate-section {
   display: flex;

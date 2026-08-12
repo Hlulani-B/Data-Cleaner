@@ -76,6 +76,44 @@ export function removeEmptyRows(data) {
   );
 }
 
+/** Fill empty cells in a column using mean, median, or a custom value. */
+export function fillEmptyValues(data, column, strategy = "value", customValue = "") {
+  if (data.length === 0) return data;
+
+  const isEmpty = (v) => v === undefined || v === null || v === "" || (typeof v === "string" && v.trim() === "");
+
+  let fillWith;
+  if (strategy === "mean" || strategy === "median") {
+    const nums = data
+      .map((row) => row[column])
+      .filter((v) => !isEmpty(v))
+      .map((v) => Number(v))
+      .filter((n) => !isNaN(n));
+    if (nums.length === 0) {
+      // No numeric values to compute from; fall back to the custom value.
+      fillWith = customValue;
+    } else if (strategy === "mean") {
+      const sum = nums.reduce((a, b) => a + b, 0);
+      fillWith = sum / nums.length;
+    } else {
+      const sorted = [...nums].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      fillWith = sorted.length % 2 === 0
+        ? (sorted[mid - 1] + sorted[mid]) / 2
+        : sorted[mid];
+    }
+  } else {
+    fillWith = customValue;
+  }
+
+  return data.map((row) => {
+    if (isEmpty(row[column])) {
+      return { ...row, [column]: fillWith };
+    }
+    return { ...row };
+  });
+}
+
 /** Lowercase a column */
 export function lowercaseColumn(data, column) {
   return data.map((row) => {

@@ -5,7 +5,7 @@ import EmptyValues from "./emptyvalues";
 import { Values } from "../functions/user_choice/getValues";
 import {
   trimData, cleanData, removeDuplicates, detectDatatypes,
-  removeEmptyRows, lowercaseColumn, uppercaseColumn, properCaseColumn,
+  removeEmptyRows, fillEmptyValues, lowercaseColumn, uppercaseColumn, properCaseColumn,
   removeColumn, standardizeDates, convertType,
   splitColumn, joinColumns, concatenateColumns,
   mathSingleInPlace, mathSingleNewCol, mathCumulativeSum,
@@ -54,6 +54,9 @@ const FUNCTION_RUNNERS = {
     const sheet = XLSX.utils.json_to_sheet(data);
     return XLSX.utils.sheet_to_json(valuesOps.removeRowWithValue(sheet, col, extra.findValue ?? ""), { defval: "" });
   },
+  fillEmpty: (data, col, extra) => fillEmptyValues(
+    data, col, extra.strategy || "value", extra.customValue ?? ""
+  ),
 };
 
 /* ─── Math Operations Catalogue ─── */
@@ -135,6 +138,7 @@ const FUNCTIONS = [
   { key: "replaceValues", label: "Replace Value", desc: "Replace exact cell value with another value", needsColumn: true, needsValueParams: true },
   { key: "rewrite", label: "Rewrite (Substring)", desc: "Replace a substring within cell values", needsColumn: true, needsValueParams: true },
   { key: "removeRowWithValue", label: "Remove Row by Value", desc: "Delete all rows where a column equals a value", needsColumn: true, needsRemoveValue: true },
+  { key: "fillEmpty", label: "Fill Empty Values", desc: "Fill empty cells with mean, median, or a custom value", needsColumn: true, needsFillStrategy: true },
 ];
 
 /* ─── Shared FileView component (used by both Excel and CSV) ─── */
@@ -481,6 +485,23 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
             </div>
           )}
 
+          {/* Get Unique Values Result Panel */}
+          {getValuesResult && (
+            <div className="clean-results get-values-results">
+              <strong>Unique Values: {getValuesResult.column}</strong>
+              <div className="get-values-list">
+                {getValuesResult.values.length > 0 ? (
+                  getValuesResult.values.map((val, i) => (
+                    <span key={i} className="stat-badge">{String(val)}</span>
+                  ))
+                ) : (
+                  <span className="stat-badge ok">No values found</span>
+                )}
+              </div>
+              <button className="dismiss-btn" onClick={() => setGetValuesResult(null)}>&times;</button>
+            </div>
+          )}
+
           {/* Initial Clean Gate */}
           {!initialCleanDone ? (
             <div className="gate-section">
@@ -654,7 +675,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                       className="column-chip"
                       onClick={() => {
                         const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
-                        if (fn.key === "separate" || fn.needsValueParams || fn.needsRemoveValue) {
+                        if (fn.key === "separate" || fn.needsValueParams || fn.needsRemoveValue || fn.needsFillStrategy) {
                           // Open extra params instead of applying immediately
                           setColumnPicker((prev) => ({ ...prev, selectedColumn: col, showParams: true }));
                         } else {
@@ -804,6 +825,44 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                   disabled={extraParams.findValue === undefined || extraParams.findValue === ""}
                   onClick={() => {
                     const fn = FUNCTIONS.find((f) => f.key === "removeRowWithValue");
+                    applyFunction(fn, columnPicker.selectedColumn, extraParams);
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+
+            {/* Fill Empty Values extra params */}
+            {columnPicker.funcKey === "fillEmpty" && columnPicker.selectedColumn && (
+              <div className="extra-params">
+                <p className="modal-hint">Filling empty cells in: <strong>{columnPicker.selectedColumn}</strong></p>
+                <label>
+                  Strategy:
+                  <select
+                    value={extraParams.strategy || "value"}
+                    onChange={(e) => setExtraParams({ ...extraParams, strategy: e.target.value })}
+                  >
+                    <option value="value">Custom value</option>
+                    <option value="mean">Mean (numeric)</option>
+                    <option value="median">Median (numeric)</option>
+                  </select>
+                </label>
+                {(!extraParams.strategy || extraParams.strategy === "value") && (
+                  <label>
+                    Fill with:
+                    <input
+                      type="text"
+                      value={extraParams.customValue ?? ""}
+                      onChange={(e) => setExtraParams({ ...extraParams, customValue: e.target.value })}
+                      placeholder="Value to insert"
+                    />
+                  </label>
+                )}
+                <button
+                  className="primary-btn modal-apply-btn"
+                  onClick={() => {
+                    const fn = FUNCTIONS.find((f) => f.key === "fillEmpty");
                     applyFunction(fn, columnPicker.selectedColumn, extraParams);
                   }}
                 >
