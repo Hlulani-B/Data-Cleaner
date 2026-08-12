@@ -68,7 +68,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       setDrafts([]);
       // Check persisted clean-done flag for this file + sheet
       const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-      const found = stored.find((f) => f.id === file.id);
+      const found = stored.find((f) => String(f.id) === String(file.id));
       const cleaned = found?.initialCleaned?.[activeSheet] || false;
       setInitialCleanDone(cleaned);
     }
@@ -76,14 +76,37 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
 
   const columns = data.length > 0 ? Object.keys(data[0]) : [];
 
-  // Save current file state back to localStorage
+  // Save current file state back to localStorage + Neon
   const persistFile = useCallback(
     (newSheetData) => {
       const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-      const idx = stored.findIndex((f) => f.id === file.id);
+      let idx = stored.findIndex((f) => String(f.id) === String(file.id));
+
+      // If file was loaded from Neon only, add it to localStorage
+      if (idx === -1 && file.sheets) {
+        stored.unshift({ ...file });
+        idx = 0;
+        localStorage.setItem("dc_files", JSON.stringify(stored));
+      }
+
       if (idx !== -1) {
         stored[idx].sheets[activeSheet] = newSheetData;
         localStorage.setItem("dc_files", JSON.stringify(stored));
+
+        // Also save to Neon (fire-and-forget)
+        const email = localStorage.getItem("dc_userEmail");
+        if (email) {
+          fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "update",
+              fileId: Number(file.id),
+              sheets: stored[idx].sheets,
+              sheetNames: stored[idx].sheetNames,
+            }),
+          }).catch(() => {});
+        }
       }
     },
     [file, activeSheet]
@@ -128,7 +151,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
 
     // Persist clean-done flag so it never runs again for this file + sheet
     const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-    const idx = stored.findIndex((f) => f.id === file.id);
+    const idx = stored.findIndex((f) => String(f.id) === String(file.id));
     if (idx !== -1) {
       if (!stored[idx].initialCleaned) stored[idx].initialCleaned = {};
       stored[idx].initialCleaned[activeSheet] = true;
@@ -590,10 +613,26 @@ function ExcelFile() {
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-    const found = stored.find((f) => f.id === fileId);
+    const found = stored.find((f) => String(f.id) === String(fileId));
     if (found) {
       setFile(found);
       setActiveSheet(found.sheetNames[0] || "");
+    } else {
+      // Fallback: try loading from Neon
+      fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get", fileId: Number(fileId) }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.file) {
+            const f = { ...res.file, id: String(res.file.id) };
+            setFile(f);
+            setActiveSheet(f.sheetNames[0] || "");
+          }
+        })
+        .catch(() => {});
     }
   }, [fileId]);
 

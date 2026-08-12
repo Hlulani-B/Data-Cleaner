@@ -13,21 +13,44 @@ function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-    setFiles(stored);
     const name = localStorage.getItem("dc_username");
     if (name) setUsername(name);
     const photo = localStorage.getItem("dc_userPhoto");
     if (photo) setUserPhoto(photo);
 
-    // Ensure user is registered in Neon (covers page-refresh / returning users)
     const email = localStorage.getItem("dc_userEmail");
     if (email) {
+      // Ensure user is registered in Neon
       fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, name: name || email.split("@")[0] }),
-      }).catch(() => {}); // silent — registration is best-effort
+      }).catch(() => {});
+
+      // Load files from Neon (best-effort, fall back to localStorage)
+      fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list", userEmail: email }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.files && res.files.length > 0) {
+            setFiles(res.files);
+            localStorage.setItem("dc_files", JSON.stringify(res.files));
+          } else {
+            // Fall back to localStorage
+            const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
+            setFiles(stored);
+          }
+        })
+        .catch(() => {
+          const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
+          setFiles(stored);
+        });
+    } else {
+      const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
+      setFiles(stored);
     }
   }, []);
 
@@ -47,7 +70,7 @@ function Dashboard() {
 
       const ext = file.name.split(".").pop().toLowerCase();
       const filetype = ext === "csv" ? "csv" : "excel";
-      const id = Date.now().toString();
+      const tempId = Date.now().toString();
 
       const sheets = {};
       workbook.SheetNames.forEach((name) => {
@@ -55,7 +78,7 @@ function Dashboard() {
       });
 
       const newFile = {
-        id,
+        id: tempId,
         filename: file.name,
         filetype,
         sheets,
@@ -63,8 +86,40 @@ function Dashboard() {
         createdAt: new Date().toISOString(),
       };
 
+      // Save locally first for instant UI
       saveFiles([newFile, ...files]);
-      navigate(`/${filetype}/${id}`);
+      navigate(`/${filetype}/${tempId}`);
+
+      // Then save to Neon
+      const email = localStorage.getItem("dc_userEmail");
+      if (email) {
+        fetch("/api/files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save",
+            filename: file.name,
+            filetype,
+            sheets,
+            sheetNames: workbook.SheetNames,
+            userEmail: email,
+          }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            if (res.file) {
+              // Read current localStorage (not stale closure)
+              const current = JSON.parse(localStorage.getItem("dc_files") || "[]");
+              const realId = String(res.file.id);
+              // Replace tempId with the real Neon id
+              const updated = current.map((f) =>
+                f.id === tempId ? { ...f, id: realId } : f
+              );
+              saveFiles(updated);
+            }
+          })
+          .catch(() => {}); // localStorage still works if Neon fails
+      }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = "";
@@ -73,6 +128,12 @@ function Dashboard() {
   const handleDelete = (id, e) => {
     e.stopPropagation();
     saveFiles(files.filter((f) => f.id !== id));
+    // Also delete from Neon
+    fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", fileId: Number(id) }),
+    }).catch(() => {}); // silent
   };
 
   return (

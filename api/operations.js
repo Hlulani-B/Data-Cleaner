@@ -6,21 +6,21 @@
  * Body: { operation: "upper"|"lower"|..., data: [...], column?, ...extraParams }
  */
 import XLSX from "xlsx";
-import { Upper } from "./functions/user_choice/upper.js";
-import { Lower } from "./functions/user_choice/lower.js";
-import { Proper } from "./functions/user_choice/proper.js";
-import { RemoveColumn } from "./functions/user_choice/removeColumn.js";
-import { RemoveEmpty } from "./functions/user_choice/removeEmpty.js";
-import { MissingValues } from "./functions/user_choice/missingValues.js";
-import { DateStandard } from "./functions/user_choice/dateStandard.js";
-import { TypeConversion } from "./functions/user_choice/typeConversion.js";
-import { Clean } from "./functions/automatic/clean.js";
-import { Duplicate } from "./functions/automatic/duplicates.js";
-import { Trim } from "./functions/automatic/trim.js";
-import { Datatype } from "./functions/automatic/datatype.js";
-import Separate from "./functions/user_choice/seperate.js";
-import Join from "./functions/user_choice/join.js";
-import Concatenate from "./functions/user_choice/concatenate.js";
+import { Upper } from "../src/functions/user_choice/upper.js";
+import { Lower } from "../src/functions/user_choice/lower.js";
+import { Proper } from "../src/functions/user_choice/proper.js";
+import { RemoveColumn } from "../src/functions/user_choice/removeColumn.js";
+import { RemoveEmpty } from "../src/functions/user_choice/removeEmpty.js";
+import { MissingValues } from "../src/functions/user_choice/missingValues.js";
+import { DateStandard } from "../src/functions/user_choice/dateStandard.js";
+import { TypeConversion } from "../src/functions/user_choice/typeConversion.js";
+import { Clean } from "../src/functions/automatic/clean.js";
+import { Duplicate } from "../src/functions/automatic/duplicates.js";
+import { Trim } from "../src/functions/automatic/trim.js";
+import { Datatype } from "../src/functions/automatic/datatype.js";
+import Separate from "../src/functions/user_choice/seperate.js";
+import Join from "../src/functions/user_choice/join.js";
+import Concatenate from "../src/functions/user_choice/concatenate.js";
 
 function toSheet(data) { return XLSX.utils.json_to_sheet(data); }
 function toData(sheet) { return XLSX.utils.sheet_to_json(sheet); }

@@ -16,7 +16,7 @@ export class Database {
         id SERIAL PRIMARY KEY,
         filename VARCHAR(255) NOT NULL,
         filetype VARCHAR(10) NOT NULL CHECK (filetype IN ('csv', 'excel')),
-        file_path VARCHAR(500) NOT NULL,
+        file_path TEXT NOT NULL,
         "user" VARCHAR(255) REFERENCES Users(email)
       )
     `;
@@ -25,7 +25,7 @@ export class Database {
         id SERIAL PRIMARY KEY,
         filename VARCHAR(255) NOT NULL,
         filetype VARCHAR(10) NOT NULL CHECK (filetype IN ('csv', 'excel')),
-        file_path VARCHAR(500) NOT NULL,
+        file_path TEXT NOT NULL,
         "user" VARCHAR(255) REFERENCES Users(email),
         file_id INTEGER REFERENCES Files(id),
         position INTEGER NOT NULL
@@ -38,6 +38,21 @@ export class Database {
         sheet_number INTEGER,
         image_path VARCHAR(500) NOT NULL
       )
+    `;
+
+    // Migration: ensure file_path columns are TEXT (not VARCHAR(500))
+    try {
+      await sql`ALTER TABLE Files ALTER COLUMN file_path TYPE TEXT`;
+    } catch {}
+    try {
+      await sql`ALTER TABLE File_Versions ALTER COLUMN file_path TYPE TEXT`;
+    } catch {}
+  }
+
+  // Update file content
+  async updateFile(fileId, filePath) {
+    await sql`
+      UPDATE Files SET file_path = ${filePath} WHERE id = ${fileId}
     `;
   }
 
