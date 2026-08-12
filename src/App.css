@@ -415,24 +415,26 @@
 /* ─── File Content ─── */
 .file-content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
+.file-content > *:not(.functions-section) {
+  flex-shrink: 0;
+}
+
 /* ─── Data Table ─── */
 .table-wrap {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 340px;
+  max-height: 35vh;
   border: 1px solid var(--border);
   border-radius: 8px;
-  position: sticky;
-  top: 10px;
   background: var(--card-bg, var(--bg));
-  z-index: 10;
+  flex-shrink: 0;
 }
 
 .data-table {
@@ -874,6 +876,13 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.functions-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .section-heading {
