@@ -91,61 +91,81 @@ function Dashboard() {
     if (!file) return;
 
     const reader = new FileReader();
+    reader.onerror = () => {
+      alert("Failed to read file: " + (reader.error?.message || "unknown error"));
+    };
     reader.onload = (evt) => {
-      const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
 
-      const ext = file.name.split(".").pop().toLowerCase();
-      const filetype = ext === "csv" ? "csv" : "excel";
-      const tempId = Date.now().toString();
+        const name = file.name.toLowerCase();
+        const ext = name.includes(".") ? name.split(".").pop() : "";
+        const filetype = ext === "csv" ? "csv" : "excel";
+        const tempId = Date.now().toString();
 
-      const sheets = {};
-      workbook.SheetNames.forEach((name) => {
-        sheets[name] = XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: "" });
-      });
+        const sheets = {};
+        workbook.SheetNames.forEach((sheetName) => {
+          sheets[sheetName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+        });
 
-      const newFile = {
-        id: tempId,
-        filename: file.name,
-        filetype,
-        sheets,
-        sheetNames: workbook.SheetNames,
-        createdAt: new Date().toISOString(),
-      };
+        // Validate: at least one sheet must have a header row
+        const hasData = Object.values(sheets).some(
+          (rows) => Array.isArray(rows)
+        );
+        if (!hasData) {
+          alert("Could not parse file. Make sure it's a valid CSV or Excel file.");
+          return;
+        }
 
-      // Save locally first for instant UI
-      saveFiles([newFile, ...files]);
-      navigate(`/${filetype}/${tempId}`);
+        const newFile = {
+          id: tempId,
+          filename: file.name,
+          filetype,
+          sheets,
+          sheetNames: workbook.SheetNames,
+          createdAt: new Date().toISOString(),
+        };
 
-      // Then save to Neon
-      const email = localStorage.getItem("dc_userEmail");
-      if (email) {
-        fetch("/api/files", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "save",
-            filename: file.name,
-            filetype,
-            sheets,
-            sheetNames: workbook.SheetNames,
-            userEmail: email,
-          }),
-        })
-          .then((r) => r.json())
-          .then((res) => {
-            if (res.file) {
-              // Read current localStorage (not stale closure)
-              const current = JSON.parse(localStorage.getItem("dc_files") || "[]");
-              const realId = String(res.file.id);
-              // Replace tempId with the real Neon id
-              const updated = current.map((f) =>
-                f.id === tempId ? { ...f, id: realId } : f
-              );
-              saveFiles(updated);
-            }
+        // Save locally first for instant UI
+        saveFiles([newFile, ...files]);
+        navigate(`/${filetype}/${tempId}`);
+
+        // Then save to Neon
+        const email = localStorage.getItem("dc_userEmail");
+        if (email) {
+          fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "save",
+              filename: file.name,
+              filetype,
+              sheets,
+              sheetNames: workbook.SheetNames,
+              userEmail: email,
+            }),
           })
-          .catch(() => {}); // localStorage still works if Neon fails
+            .then((r) => {
+              if (!r.ok) throw new Error(`Server error: ${r.status}`);
+              return r.json();
+            })
+            .then((res) => {
+              if (res.file) {
+                // Read current localStorage (not stale closure)
+                const current = JSON.parse(localStorage.getItem("dc_files") || "[]");
+                const realId = String(res.file.id);
+                // Replace tempId with the real Neon id
+                const updated = current.map((f) =>
+                  f.id === tempId ? { ...f, id: realId } : f
+                );
+                saveFiles(updated);
+              }
+            })
+            .catch(() => {}); // localStorage still works if Neon fails
+        }
+      } catch (err) {
+        alert("Failed to parse file: " + err.message);
       }
     };
     reader.readAsArrayBuffer(file);
