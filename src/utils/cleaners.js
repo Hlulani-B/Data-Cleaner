@@ -373,3 +373,394 @@ export function mathAverageColumns(data, columns, newColumn) {
     return out;
   });
 }
+
+/* ─── Replace & Search ─── */
+
+/** Replace occurrences of a substring in a column (all or nth). */
+export function replaceText(data, column, find, replaceWith, occurrence) {
+  return data.map((row) => {
+    const out = { ...row };
+    const original = String(out[column] ?? "");
+    if (occurrence === undefined || occurrence === null || occurrence === "") {
+      out[column] = original.split(find).join(replaceWith);
+    } else {
+      const n = Number(occurrence);
+      let count = 0;
+      let index = -1;
+      let searchFrom = 0;
+      while (count < n) {
+        index = original.indexOf(find, searchFrom);
+        if (index === -1) break;
+        searchFrom = index + find.length;
+        count++;
+      }
+      out[column] = (index !== -1 && count === n)
+        ? original.slice(0, index) + replaceWith + original.slice(index + find.length)
+        : original;
+    }
+    return out;
+  });
+}
+
+/** Filter rows where any column contains the keyword. */
+export function searchRows(data, keyword) {
+  const term = String(keyword).toLowerCase();
+  return data.filter((row) =>
+    Object.values(row).some((val) =>
+      String(val ?? "").toLowerCase().includes(term)
+    )
+  );
+}
+
+/* ─── Simple transforms ─── */
+
+/** Absolute value of a numeric column. */
+export function absoluteColumn(data, column) {
+  return data.map((row) => {
+    const out = { ...row };
+    const num = Number(out[column]);
+    if (!isNaN(num)) out[column] = Math.abs(num);
+    return out;
+  });
+}
+
+/* ─── Column / Row operations ─── */
+
+/** Rename a column. */
+export function renameColumn(data, oldName, newName) {
+  if (oldName === newName) return data;
+  return data.map((row) => {
+    const out = { ...row };
+    if (Object.prototype.hasOwnProperty.call(out, oldName)) {
+      out[newName] = out[oldName];
+      delete out[oldName];
+    }
+    return out;
+  });
+}
+
+/** Duplicate a column under a new name. */
+export function duplicateColumn(data, column, newColumn) {
+  return data.map((row) => ({ ...row, [newColumn]: row[column] }));
+}
+
+/** Reorder columns (unlisted columns are kept at the end). */
+export function reorderColumns(data, orderedColumns) {
+  return data.map((row) => {
+    const out = {};
+    orderedColumns.forEach((col) => {
+      if (Object.prototype.hasOwnProperty.call(row, col)) out[col] = row[col];
+    });
+    Object.keys(row).forEach((col) => {
+      if (!orderedColumns.includes(col)) out[col] = row[col];
+    });
+    return out;
+  });
+}
+
+/** Filter rows by a condition on a column. */
+export function filterRows(data, column, condition, value) {
+  return data.filter((row) => {
+    const cell = row[column];
+    switch (condition) {
+      case "equals": return String(cell) === String(value);
+      case "not_equals": return String(cell) !== String(value);
+      case "greater_than": return Number(cell) > Number(value);
+      case "less_than": return Number(cell) < Number(value);
+      case "contains": return String(cell ?? "").includes(value);
+      case "starts_with": return String(cell ?? "").startsWith(value);
+      case "ends_with": return String(cell ?? "").endsWith(value);
+      default: return true;
+    }
+  });
+}
+
+/** Sort rows by a column. */
+export function sortRows(data, column, direction = "asc") {
+  const sorted = [...data].sort((a, b) => {
+    const valA = a[column];
+    const valB = b[column];
+    const numA = Number(valA), numB = Number(valB);
+    let cmp;
+    if (!isNaN(numA) && !isNaN(numB)) {
+      cmp = numA - numB;
+    } else {
+      cmp = String(valA ?? "").localeCompare(String(valB ?? ""));
+    }
+    return direction === "desc" ? -cmp : cmp;
+  });
+  return sorted;
+}
+
+/** Sample rows (first n or random n). */
+export function sampleRows(data, count, mode = "first") {
+  const n = Number(count);
+  if (mode === "random") {
+    return [...data].sort(() => Math.random() - 0.5).slice(0, n);
+  }
+  return data.slice(0, n);
+}
+
+/* ─── Date operations ─── */
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export function extractYear(data, column, newColumn) {
+  return data.map((row) => {
+    const d = new Date(row[column]);
+    return { ...row, [newColumn]: isNaN(d) ? "" : d.getFullYear() };
+  });
+}
+
+export function extractMonth(data, column, newColumn) {
+  return data.map((row) => {
+    const d = new Date(row[column]);
+    return { ...row, [newColumn]: isNaN(d) ? "" : d.getMonth() + 1 };
+  });
+}
+
+export function extractDay(data, column, newColumn) {
+  return data.map((row) => {
+    const d = new Date(row[column]);
+    return { ...row, [newColumn]: isNaN(d) ? "" : d.getDate() };
+  });
+}
+
+export function extractDayOfWeek(data, column, newColumn) {
+  return data.map((row) => {
+    const d = new Date(row[column]);
+    return { ...row, [newColumn]: isNaN(d) ? "" : DAY_NAMES[d.getDay()] };
+  });
+}
+
+export function dateDifference(data, colA, colB, newColumn, unit = "days") {
+  const msPerUnit = { days: 86400000, hours: 3600000, minutes: 60000 };
+  return data.map((row) => {
+    const a = new Date(row[colA]);
+    const b = new Date(row[colB]);
+    return { ...row, [newColumn]: (!isNaN(a) && !isNaN(b)) ? Math.round((b - a) / (msPerUnit[unit] || msPerUnit.days)) : "" };
+  });
+}
+
+export function addDays(data, column, days) {
+  const n = Number(days);
+  return data.map((row) => {
+    const out = { ...row };
+    const d = new Date(out[column]);
+    if (!isNaN(d)) {
+      d.setDate(d.getDate() + n);
+      out[column] = d.toISOString().split("T")[0];
+    }
+    return out;
+  });
+}
+
+export function ageFromBirthdate(data, column, newColumn) {
+  const today = new Date();
+  return data.map((row) => {
+    const d = new Date(row[column]);
+    if (isNaN(d)) return { ...row, [newColumn]: "" };
+    let age = today.getFullYear() - d.getFullYear();
+    const monthDiff = today.getMonth() - d.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age--;
+    return { ...row, [newColumn]: age };
+  });
+}
+
+export function isWeekend(data, column, newColumn) {
+  return data.map((row) => {
+    const d = new Date(row[column]);
+    if (isNaN(d)) return { ...row, [newColumn]: "" };
+    const day = d.getDay();
+    return { ...row, [newColumn]: day === 0 || day === 6 };
+  });
+}
+
+/* ─── Formatting & Validation ─── */
+
+export function currencyFormat(data, column, symbol = "$", newColumn) {
+  const target = newColumn || column;
+  return data.map((row) => {
+    const out = { ...row };
+    const num = Number(out[column]);
+    if (!isNaN(num)) {
+      out[target] = symbol + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    return out;
+  });
+}
+
+export function percentageFormat(data, column, decimals = 1, newColumn) {
+  const target = newColumn || column;
+  return data.map((row) => {
+    const out = { ...row };
+    const num = Number(out[column]);
+    if (!isNaN(num)) {
+      out[target] = (num * 100).toFixed(decimals) + "%";
+    }
+    return out;
+  });
+}
+
+export function labelEncode(data, column) {
+  const unique = [...new Set(data.map((row) => row[column]))];
+  const map = {};
+  unique.forEach((val, i) => { map[val] = i; });
+  return data.map((row) => ({ ...row, [column]: map[row[column]] }));
+}
+
+export function oneHotEncode(data, column) {
+  const unique = [...new Set(data.map((row) => row[column]))];
+  return data.map((row) => {
+    const out = { ...row };
+    const value = out[column];
+    unique.forEach((val) => {
+      out[`${column}_${val}`] = value === val;
+    });
+    delete out[column];
+    return out;
+  });
+}
+
+export function emailValidityCheck(data, column, newColumn) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return data.map((row) => ({
+    ...row,
+    [newColumn]: emailRegex.test(String(row[column] ?? "")),
+  }));
+}
+
+export function phoneFormatCheck(data, column, newColumn) {
+  const phoneRegex = /^\+?[0-9\s\-()]{7,15}$/;
+  return data.map((row) => ({
+    ...row,
+    [newColumn]: phoneRegex.test(String(row[column] ?? "")),
+  }));
+}
+
+export function flagOutliers(data, column, newColumn, stdDevThreshold = 2) {
+  const nums = data.map((row) => Number(row[column])).filter((n) => !isNaN(n));
+  const mean = nums.reduce((a, b) => a + b, 0) / nums.length;
+  const variance = nums.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / nums.length;
+  const stdDev = Math.sqrt(variance);
+  return data.map((row) => {
+    const num = Number(row[column]);
+    return { ...row, [newColumn]: !isNaN(num) && Math.abs(num - mean) > stdDevThreshold * stdDev };
+  });
+}
+
+/* ─── Text operations ─── */
+
+export function removeSpecialCharacters(data, column) {
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").replace(/[^a-zA-Z0-9\s]/g, ""),
+  }));
+}
+
+export function removeNumbers(data, column) {
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").replace(/[0-9]/g, ""),
+  }));
+}
+
+export function collapseWhitespace(data, column) {
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").replace(/\s+/g, " ").trim(),
+  }));
+}
+
+export function padLeft(data, column, length, padChar = "0") {
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").padStart(Number(length), padChar),
+  }));
+}
+
+export function padRight(data, column, length, padChar = " ") {
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").padEnd(Number(length), padChar),
+  }));
+}
+
+export function truncateText(data, column, maxLength) {
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").slice(0, Number(maxLength)),
+  }));
+}
+
+export function extractSubstring(data, column, newColumn, start, end) {
+  return data.map((row) => ({
+    ...row,
+    [newColumn]: String(row[column] ?? "").slice(Number(start), Number(end)),
+  }));
+}
+
+export function reverseText(data, column) {
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").split("").reverse().join(""),
+  }));
+}
+
+export function countCharacters(data, column, newColumn) {
+  return data.map((row) => ({
+    ...row,
+    [newColumn]: String(row[column] ?? "").length,
+  }));
+}
+
+export function countWords(data, column, newColumn) {
+  return data.map((row) => {
+    const str = String(row[column] ?? "").trim();
+    return { ...row, [newColumn]: str === "" ? 0 : str.split(/\s+/).length };
+  });
+}
+
+export function containsCheck(data, column, newColumn, substring) {
+  return data.map((row) => ({
+    ...row,
+    [newColumn]: String(row[column] ?? "").includes(substring),
+  }));
+}
+
+export function startsWithCheck(data, column, newColumn, prefix) {
+  return data.map((row) => ({
+    ...row,
+    [newColumn]: String(row[column] ?? "").startsWith(prefix),
+  }));
+}
+
+export function endsWithCheck(data, column, newColumn, suffix) {
+  return data.map((row) => ({
+    ...row,
+    [newColumn]: String(row[column] ?? "").endsWith(suffix),
+  }));
+}
+
+export function regexExtract(data, column, newColumn, pattern, flags = "") {
+  const regex = new RegExp(pattern, flags);
+  return data.map((row) => {
+    const match = String(row[column] ?? "").match(regex);
+    return { ...row, [newColumn]: match ? match[0] : "" };
+  });
+}
+
+export function regexReplace(data, column, pattern, replaceWith, flags = "g") {
+  const regex = new RegExp(pattern, flags);
+  return data.map((row) => ({
+    ...row,
+    [column]: String(row[column] ?? "").replace(regex, replaceWith),
+  }));
+}
+
+export function sentenceCase(data, column) {
+  return data.map((row) => {
+    const str = String(row[column] ?? "").toLowerCase();
+    return { ...row, [column]: str ? str.charAt(0).toUpperCase() + str.slice(1) : "" };
+  });
+}
