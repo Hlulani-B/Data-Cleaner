@@ -171,7 +171,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       pushHistory();
       const runner = FUNCTION_RUNNERS[funcDef.key];
       if (!runner) throw new Error(`Unknown function: ${funcDef.key}`);
-      const newData = funcDef.needsColumn ? runner(data, column, extra) : runner(data);
+      const newData = funcDef.needsColumn ? runner(data, column, extra) : runner(data, null, extra);
       setData(newData);
       persistFile(newData);
       saveDraft(funcDef.label + (column ? ` (${column})` : ""));
