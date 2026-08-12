@@ -12,6 +12,9 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {
+    "@cerebras/cerebras_cloud_sdk": "^1.91.0",
+    "@google/generative-ai": "^0.24.1",
+    "@huggingface/inference": "^4.13.25",
     "@neondatabase/serverless": "^1.1.0",
     "express": "^5.2.1",
     "firebase": "^12.17.1",

@@ -1,6 +1,24 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/api/auth", "destination": "/api/auth" },
+    { "source": "/api/ai", "destination": "/api/ai" },
+    { "source": "/api/operations", "destination": "/api/operations" },
+    { "source": "/api/clean", "destination": "/api/operations" },
+    { "source": "/api/upper", "destination": "/api/operations" },
+    { "source": "/api/lower", "destination": "/api/operations" },
+    { "source": "/api/proper", "destination": "/api/operations" },
+    { "source": "/api/removeColumn", "destination": "/api/operations" },
+    { "source": "/api/removeEmpty", "destination": "/api/operations" },
+    { "source": "/api/missingValues", "destination": "/api/operations" },
+    { "source": "/api/dateStandard", "destination": "/api/operations" },
+    { "source": "/api/typeConversion", "destination": "/api/operations" },
+    { "source": "/api/duplicates", "destination": "/api/operations" },
+    { "source": "/api/trim", "destination": "/api/operations" },
+    { "source": "/api/datatype", "destination": "/api/operations" },
+    { "source": "/api/upload", "destination": "/api/operations" },
+    { "source": "/api/seperate", "destination": "/api/operations" },
+    { "source": "/api/join", "destination": "/api/operations" },
+    { "source": "/api/concatenate", "destination": "/api/operations" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

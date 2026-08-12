@@ -14,51 +14,45 @@ async function start() {
   app.use(express.json({ limit: "50mb" }));
 
   // ─── Dynamically import API handlers (after env is loaded) ───
-  const handlerModules = await Promise.all([
+  const [operationsMod, authMod] = await Promise.all([
+    import("../api/operations.js"),
     import("../api/auth.js"),
-    import("../api/clean.js"),
-    import("../api/upper.js"),
-    import("../api/lower.js"),
-    import("../api/proper.js"),
-    import("../api/removeColumn.js"),
-    import("../api/removeEmpty.js"),
-    import("../api/missingValues.js"),
-    import("../api/dateStandard.js"),
-    import("../api/typeConversion.js"),
-    import("../api/duplicates.js"),
-    import("../api/trim.js"),
-    import("../api/datatype.js"),
-    import("../api/upload.js"),
-    import("../api/seperate.js"),
-    import("../api/join.js"),
-    import("../api/concatenate.js"),
   ]);
 
-  const routePaths = [
-    "/api/auth",
-    "/api/clean",
-    "/api/upper",
-    "/api/lower",
-    "/api/proper",
-    "/api/removeColumn",
-    "/api/removeEmpty",
-    "/api/missingValues",
-    "/api/dateStandard",
-    "/api/typeConversion",
-    "/api/duplicates",
-    "/api/trim",
-    "/api/datatype",
-    "/api/upload",
-    "/api/seperate",
-    "/api/join",
-    "/api/concatenate",
+  const operations = operationsMod.default;
+  const auth = authMod.default;
+
+  // ai.js depends on optional packages — load gracefully
+  let ai = null;
+  try {
+    const aiMod = await import("../api/ai.js");
+    ai = aiMod.default;
+  } catch (err) {
+    console.warn("AI module skipped — missing dependencies:", err.code || err.message);
+  }
+
+  // ─── Primary routes ───
+  app.all("/api/operations", (req, res) => operations(req, res));
+  app.all("/api/auth", (req, res) => auth(req, res));
+  if (ai) {
+    app.all("/api/ai", (req, res) => ai(req, res));
+  }
+
+  // ─── Legacy routes → forward to operations (backward compat) ───
+  const legacyOps = [
+    "clean", "upper", "lower", "proper", "removeColumn",
+    "removeEmpty", "missingValues", "dateStandard", "typeConversion",
+    "duplicates", "trim", "datatype", "upload",
+    "seperate", "join", "concatenate",
   ];
 
-  // Mount each handler at its route
-  routePaths.forEach((path, i) => {
-    const handler = handlerModules[i].default;
-    app.all(path, (req, res) => handler(req, res));
-  });
+  for (const name of legacyOps) {
+    const opName = name === "seperate" ? "separate" : name;
+    app.all(`/api/${name}`, (req, res) => {
+      req.body = { ...req.body, operation: opName };
+      return operations(req, res);
+    });
+  }
 
   // ─── Vite dev middleware (serves frontend + HMR) ───
   const vite = await createViteServer({
