@@ -692,7 +692,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       </nav>
 
       {/* Main Content */}
-      <div className="file-layout">
+      <div className={`file-layout ${sheetNames && sheetNames.length > 1 ? "with-sidebar" : ""}`}>
         {/* Sheet sidebar (Excel only) */}
         {sheetNames && sheetNames.length > 1 && (
           <aside className="sheet-sidebar">
@@ -718,32 +718,33 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
             </div>
           )}
 
-          {/* Search Bar */}
-          {data.length > 0 && (
-            <div className="search-bar">
-              <span className="search-icon">&#128269;</span>
-              <input
-                type="text"
-                className="search-input"
-                placeholder="Search all columns..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <>
-                  <span className="search-count">
-                    {filteredData.length} of {data.length} rows
-                  </span>
-                  <button className="search-clear" onClick={() => setSearchQuery("")} title="Clear search">
-                    &times;
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+          {/* Fixed Data Panel (search + table + result banners) */}
+          <div className="data-panel">
+            {data.length > 0 && (
+              <div className="search-bar">
+                <span className="search-icon">&#128269;</span>
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="Search all columns..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <>
+                    <span className="search-count">
+                      {filteredData.length} of {data.length} rows
+                    </span>
+                    <button className="search-clear" onClick={() => setSearchQuery("")} title="Clear search">
+                      &times;
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
-          {/* Data Table / Empty Values Inspector */}
-          {showEmptyValues ? (
+            {/* Data Table / Empty Values Inspector */}
+            {showEmptyValues ? (
             <EmptyValues
               data={data}
               onUpdate={(newData) => {
@@ -826,6 +827,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               <button className="dismiss-btn" onClick={() => setGetValuesResult(null)}>&times;</button>
             </div>
           )}
+          </div>
 
           {/* Initial Clean Gate */}
           {!initialCleanDone ? (

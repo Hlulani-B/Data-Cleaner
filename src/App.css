@@ -415,26 +415,51 @@
 /* ─── File Content ─── */
 .file-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
-.file-content > *:not(.functions-section) {
-  flex-shrink: 0;
+/* ─── Fixed Data Panel (search + table + result banners) ─── */
+.data-panel {
+  position: fixed;
+  top: 56px; /* below top-nav */
+  left: 24px;
+  right: 24px;
+  max-height: 42vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0;
+  background: var(--bg);
+  z-index: 40;
+}
+
+.with-sidebar .data-panel {
+  left: calc(140px + 24px);
+}
+
+.data-panel:empty {
+  display: none;
+}
+
+/* Push page content below the fixed data panel */
+.file-content > .gate-section,
+.file-content > .functions-section,
+.file-content > .drafts-section {
+  margin-top: calc(42vh + 24px);
 }
 
 /* ─── Data Table ─── */
 .table-wrap {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 35vh;
+  max-height: 28vh;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card-bg, var(--bg));
-  flex-shrink: 0;
 }
 
 .data-table {
@@ -876,13 +901,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.functions-section {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .section-heading {
