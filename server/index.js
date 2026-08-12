@@ -46,7 +46,7 @@ async function start() {
     "clean", "upper", "lower", "proper", "removeColumn",
     "removeEmpty", "missingValues", "dateStandard", "typeConversion",
     "duplicates", "trim", "datatype", "upload",
-    "seperate", "join", "concatenate",
+    "seperate", "join", "concatenate", "math", "absolute",
   ];
 
   for (const name of legacyOps) {

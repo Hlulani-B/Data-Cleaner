@@ -222,3 +222,116 @@ export function convertType(data, column, targetType) {
     return out;
   });
 }
+
+/* ─── Math Operations (client-side) ─── */
+
+/** Apply a single-column in-place math transform */
+export function mathSingleInPlace(data, column, op, param) {
+  return data.map((row) => {
+    const out = { ...row };
+    const num = Number(out[column]);
+    if (isNaN(num)) return out;
+    switch (op) {
+      case "absolute": out[column] = Math.abs(num); break;
+      case "ceil": out[column] = Math.ceil(num); break;
+      case "floor": out[column] = Math.floor(num); break;
+      case "negate": out[column] = -num; break;
+      case "addConstant": out[column] = num + (param || 0); break;
+      case "multiplyConstant": out[column] = num * (param || 1); break;
+      case "round": {
+        const factor = Math.pow(10, param || 0);
+        out[column] = Math.round(num * factor) / factor;
+        break;
+      }
+    }
+    return out;
+  });
+}
+
+/** Apply a single-column math op that writes to a new column */
+export function mathSingleNewCol(data, column, newColumn, op, param) {
+  return data.map((row) => {
+    const out = { ...row };
+    const num = Number(out[column]);
+    switch (op) {
+      case "squareRoot":
+        out[newColumn] = (!isNaN(num) && num >= 0) ? Math.sqrt(num) : "";
+        break;
+      case "power":
+        out[newColumn] = !isNaN(num) ? Math.pow(num, param || 2) : "";
+        break;
+      case "log":
+        out[newColumn] = (!isNaN(num) && num > 0) ? Math.log(num) / Math.log(param || Math.E) : "";
+        break;
+      case "cumulativeSum":
+        // handled separately below
+        break;
+    }
+    return out;
+  });
+}
+
+/** Cumulative sum — needs running total across rows */
+export function mathCumulativeSum(data, column, newColumn) {
+  let running = 0;
+  return data.map((row) => {
+    const out = { ...row };
+    const num = Number(out[column]);
+    if (!isNaN(num)) running += num;
+    out[newColumn] = running;
+    return out;
+  });
+}
+
+/** Two-column math op producing a new column */
+export function mathTwoColumn(data, colA, colB, newColumn, op) {
+  return data.map((row) => {
+    const out = { ...row };
+    const a = Number(row[colA]);
+    const b = Number(row[colB]);
+    const valid = !isNaN(a) && !isNaN(b);
+    switch (op) {
+      case "add": out[newColumn] = valid ? a + b : ""; break;
+      case "subtract": out[newColumn] = valid ? a - b : ""; break;
+      case "multiply": out[newColumn] = valid ? a * b : ""; break;
+      case "divide": out[newColumn] = (valid && b !== 0) ? a / b : ""; break;
+      case "modulo": out[newColumn] = (valid && b !== 0) ? a % b : ""; break;
+      case "min": out[newColumn] = valid ? Math.min(a, b) : ""; break;
+      case "max": out[newColumn] = valid ? Math.max(a, b) : ""; break;
+      case "percentageOf": out[newColumn] = (valid && b !== 0) ? (a / b) * 100 : ""; break;
+      case "percentageChange": out[newColumn] = (valid && a !== 0) ? ((b - a) / a) * 100 : ""; break;
+    }
+    return out;
+  });
+}
+
+/** Sum multiple columns into a new column */
+export function mathSumColumns(data, columns, newColumn) {
+  return data.map((row) => {
+    const out = { ...row };
+    let sum = 0;
+    let valid = true;
+    columns.forEach((col) => {
+      const num = Number(row[col]);
+      if (isNaN(num)) valid = false;
+      else sum += num;
+    });
+    out[newColumn] = valid ? sum : "";
+    return out;
+  });
+}
+
+/** Average multiple columns into a new column */
+export function mathAverageColumns(data, columns, newColumn) {
+  return data.map((row) => {
+    const out = { ...row };
+    let sum = 0;
+    let count = 0;
+    columns.forEach((col) => {
+      const num = Number(row[col]);
+      if (!isNaN(num)) { sum += num; count++; }
+    });
+    out[newColumn] = count > 0 ? sum / count : "";
+    return out;
+  });
+}

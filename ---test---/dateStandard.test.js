@@ -1,4 +1,4 @@
-import { DateStandard } from '../api/functions/user_choice/dateStandard';
+import { DateStandard } from '../src/functions/user_choice/dateStandard';
 import XLSX from 'xlsx';
 
 test('converts to YYYY-MM-DD format', () => {

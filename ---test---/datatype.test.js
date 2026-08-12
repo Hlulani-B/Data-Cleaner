@@ -1,4 +1,4 @@
-import { Datatype } from '../api/functions/automatic/datatype';
+import { Datatype } from '../src/functions/automatic/datatype';
 import XLSX from 'xlsx';
 
 test('converts numeric strings to numbers', () => {

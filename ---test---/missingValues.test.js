@@ -1,4 +1,4 @@
-import { MissingValues } from '../api/functions/user_choice/missingValues';
+import { MissingValues } from '../src/functions/user_choice/missingValues';
 import XLSX from 'xlsx';
 
 describe('find_missing', () => {

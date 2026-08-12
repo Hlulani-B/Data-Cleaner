@@ -7,6 +7,8 @@ import {
   removeEmptyRows, lowercaseColumn, uppercaseColumn, properCaseColumn,
   removeColumn, standardizeDates, convertType,
   splitColumn, joinColumns, concatenateColumns,
+  mathSingleInPlace, mathSingleNewCol, mathCumulativeSum,
+  mathTwoColumn, mathSumColumns, mathAverageColumns,
 } from "../utils/cleaners";
 
 /* ─── Client-side function runners ─── */
@@ -29,7 +31,69 @@ const FUNCTION_RUNNERS = {
   concatenate: (data, _col, extra) => concatenateColumns(
     data, (extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : []), extra?.newColumn || "concatenated", extra?.customString || ""
   ),
+  math: (data, _col, extra) => runMathOp(data, extra?.mathOp, extra),
 };
+
+/* ─── Math Operations Catalogue ─── */
+const MATH_OPS = [
+  // Single-column in-place
+  { key: "absolute", label: "Absolute Value", type: "singleInPlace" },
+  { key: "ceil", label: "Ceiling", type: "singleInPlace" },
+  { key: "floor", label: "Floor", type: "singleInPlace" },
+  { key: "negate", label: "Negate", type: "singleInPlace" },
+  { key: "round", label: "Round", type: "singleParam", paramLabel: "Decimals", paramDefault: 0 },
+  { key: "addConstant", label: "Add Constant", type: "singleParam", paramLabel: "Value", paramDefault: 0 },
+  { key: "multiplyConstant", label: "Multiply Constant", type: "singleParam", paramLabel: "Value", paramDefault: 1 },
+  // Single-column → new column
+  { key: "squareRoot", label: "Square Root", type: "singleNewCol" },
+  { key: "power", label: "Power", type: "singleNewColParam", paramLabel: "Exponent", paramDefault: 2 },
+  { key: "log", label: "Logarithm", type: "singleNewColParam", paramLabel: "Base", paramDefault: Math.E },
+  { key: "cumulativeSum", label: "Cumulative Sum", type: "singleNewCol" },
+  // Two-column → new column
+  { key: "add", label: "Add Columns", type: "twoCol" },
+  { key: "subtract", label: "Subtract Columns", type: "twoCol" },
+  { key: "multiply", label: "Multiply Columns", type: "twoCol" },
+  { key: "divide", label: "Divide Columns", type: "twoCol" },
+  { key: "modulo", label: "Modulo", type: "twoCol" },
+  { key: "min", label: "Min of Two", type: "twoCol" },
+  { key: "max", label: "Max of Two", type: "twoCol" },
+  { key: "percentageOf", label: "Percentage Of", type: "twoCol" },
+  { key: "percentageChange", label: "Percentage Change", type: "twoCol" },
+  // Multi-column → new column
+  { key: "sumColumns", label: "Sum Columns", type: "multiCol" },
+  { key: "averageColumns", label: "Average Columns", type: "multiCol" },
+];
+
+/* ─── Math Runner ─── */
+function runMathOp(data, opKey, extra) {
+  const op = MATH_OPS.find((o) => o.key === opKey);
+  if (!op) throw new Error(`Unknown math operation: ${opKey}`);
+  const col = extra?.column;
+  const colA = extra?.columnA;
+  const colB = extra?.columnB;
+  const newCol = extra?.newColumn || `${opKey}_result`;
+  const param = Number(extra?.paramValue);
+  const cols = extra?.selectedColumns || [];
+
+  switch (op.type) {
+    case "singleInPlace":
+      return mathSingleInPlace(data, col, opKey);
+    case "singleParam":
+      return mathSingleInPlace(data, col, opKey, param);
+    case "singleNewCol":
+      if (opKey === "cumulativeSum") return mathCumulativeSum(data, col, newCol);
+      return mathSingleNewCol(data, col, newCol, opKey);
+    case "singleNewColParam":
+      return mathSingleNewCol(data, col, newCol, opKey, param);
+    case "twoCol":
+      return mathTwoColumn(data, colA, colB, newCol, opKey);
+    case "multiCol":
+      if (opKey === "sumColumns") return mathSumColumns(data, cols, newCol);
+      return mathAverageColumns(data, cols, newCol);
+    default:
+      throw new Error(`Unsupported math type: ${op.type}`);
+  }
+}
 
 const FUNCTIONS = [
   { key: "removeEmpty", label: "Remove Empty Rows", desc: "Remove rows where all values are empty", needsColumn: false },
@@ -43,6 +107,7 @@ const FUNCTIONS = [
   { key: "separate", label: "Separate Column", desc: "Split one column into two by a delimiter", needsColumn: true },
   { key: "join", label: "Join Columns", desc: "Combine multiple columns with a delimiter", needsColumn: false, multiColumn: true },
   { key: "concatenate", label: "Concatenate Columns", desc: "Combine multiple columns without a delimiter", needsColumn: false, multiColumn: true },
+  { key: "math", label: "Math Operations", desc: "Arithmetic, rounding, absolute, and more", needsColumn: false, isMath: true },
 ];
 
 /* ─── Shared FileView component (used by both Excel and CSV) ─── */
@@ -58,6 +123,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [extraParams, setExtraParams] = useState({}); // for date format, type target, separate params, etc.
   const [multiColumns, setMultiColumns] = useState([]); // for join / concatenate multi-column selection
   const [showEmptyValues, setShowEmptyValues] = useState(false); // toggle empty values inspector
+  const [mathModal, setMathModal] = useState(null); // { step: 'pick'|'config', mathOp, mathDef }
 
   // Load sheet data when sheet changes
   useEffect(() => {
@@ -201,7 +267,9 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   /* ─── Handle function card click ─── */
   const handleFuncClick = (funcDef) => {
     setExtraParams({});
-    if (funcDef.multiColumn) {
+    if (funcDef.isMath) {
+      setMathModal({ step: "pick" });
+    } else if (funcDef.multiColumn) {
       setColumnPicker({ funcKey: funcDef.key, label: funcDef.label, multiColumn: true });
       setMultiColumns([]);
     } else if (funcDef.needsColumn) {
@@ -602,7 +670,175 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
           </div>
         </div>
       )}
+
+      {/* ─── Math Operations Modal ─── */}
+      {mathModal && (
+        <div className="modal-overlay" onClick={() => { setMathModal(null); setExtraParams({}); setMultiColumns([]); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            {mathModal.step === "pick" ? (
+              <>
+                <h3 className="modal-title">Math Operations</h3>
+                <p className="modal-hint">Select an operation</p>
+                <div className="column-grid">
+                  {MATH_OPS.map((op) => (
+                    <button
+                      key={op.key}
+                      className="column-chip"
+                      onClick={() => {
+                        setMathModal({ step: "config", mathOp: op.key, mathDef: op });
+                        setMultiColumns([]);
+                        setExtraParams({});
+                      }}
+                    >
+                      {op.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <MathConfigStep
+                mathDef={mathModal.mathDef}
+                mathOp={mathModal.mathOp}
+                columns={columns}
+                data={data}
+                multiColumns={multiColumns}
+                setMultiColumns={setMultiColumns}
+                extraParams={extraParams}
+                setExtraParams={setExtraParams}
+                onBack={() => { setMathModal({ step: "pick" }); setExtraParams({}); setMultiColumns([]); }}
+                onApply={(extra) => {
+                  const fn = FUNCTIONS.find((f) => f.key === "math");
+                  applyFunction(fn, null, { ...extra, mathOp: mathModal.mathOp });
+                  setMathModal(null);
+                }}
+              />
+            )}
+            <button className="modal-close" onClick={() => { setMathModal(null); setExtraParams({}); setMultiColumns([]); }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/* ─── Math Config Step (column/param selection for chosen operation) ─── */
+function MathConfigStep({ mathDef, mathOp, columns, data, multiColumns, setMultiColumns, extraParams, setExtraParams, onBack, onApply }) {
+  const { type, paramLabel, paramDefault } = mathDef;
+  const needsParam = type === "singleParam" || type === "singleNewColParam";
+  const needsNewCol = ["singleNewCol", "singleNewColParam", "twoCol", "multiCol"].includes(type);
+  const isTwoCol = type === "twoCol";
+  const isMultiCol = type === "multiCol";
+
+  return (
+    <>
+      <h3 className="modal-title">{mathDef.label}</h3>
+      <button className="modal-back-btn" onClick={onBack} style={{ marginBottom: 12, cursor: "pointer", background: "none", border: "none", color: "var(--accent)", fontSize: 13 }}>
+        &larr; Back to operations
+      </button>
+
+      {/* Single column picker */}
+      {!isTwoCol && !isMultiCol && (
+        <>
+          <p className="modal-hint">Select a column</p>
+          <div className="column-grid">
+            {columns.map((col) => (
+              <button key={col} className={`column-chip ${extraParams.column === col ? "selected" : ""}`}
+                onClick={() => setExtraParams({ ...extraParams, column: col })}>
+                {col}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Two-column picker */}
+      {isTwoCol && (
+        <>
+          <p className="modal-hint">Select first column (A)</p>
+          <div className="column-grid">
+            {columns.map((col) => (
+              <button key={col} className={`column-chip ${extraParams.columnA === col ? "selected" : ""}`}
+                onClick={() => setExtraParams({ ...extraParams, columnA: col })}>
+                {col}
+              </button>
+            ))}
+          </div>
+          <p className="modal-hint">Select second column (B)</p>
+          <div className="column-grid">
+            {columns.map((col) => (
+              <button key={col} className={`column-chip ${extraParams.columnB === col ? "selected" : ""}`}
+                onClick={() => setExtraParams({ ...extraParams, columnB: col })}>
+                {col}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Multi-column picker */}
+      {isMultiCol && (
+        <>
+          <p className="modal-hint">Select two or more columns</p>
+          <div className="column-grid">
+            {columns.map((col) => {
+              const selected = multiColumns.includes(col);
+              return (
+                <button key={col} className={`column-chip ${selected ? "selected" : ""}`}
+                  onClick={() => setMultiColumns((prev) => selected ? prev.filter((c) => c !== col) : [...prev, col])}>
+                  {col}
+                </button>
+              );
+            })}
+          </div>
+          {multiColumns.length >= 2 && (
+            <div className="selected-columns-preview">
+              <strong>Selected:</strong> {multiColumns.join(", ")}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Extra params */}
+      {needsParam && (
+        <div className="extra-params">
+          <label>
+            {paramLabel}:
+            <input type="number" value={extraParams.paramValue ?? paramDefault}
+              onChange={(e) => setExtraParams({ ...extraParams, paramValue: e.target.value })} />
+          </label>
+        </div>
+      )}
+
+      {/* New column name */}
+      {needsNewCol && (
+        <div className="extra-params">
+          <label>
+            New column name:
+            <input type="text" value={extraParams.newColumn ?? `${mathOp}_result`}
+              onChange={(e) => setExtraParams({ ...extraParams, newColumn: e.target.value })}
+              placeholder={`${mathOp}_result`} />
+          </label>
+        </div>
+      )}
+
+      {/* Apply button */}
+      <button className="primary-btn modal-apply-btn"
+        disabled={
+          (!isTwoCol && !isMultiCol && !extraParams.column) ||
+          (isTwoCol && (!extraParams.columnA || !extraParams.columnB)) ||
+          (isMultiCol && multiColumns.length < 2)
+        }
+        onClick={() => {
+          const extra = { ...extraParams };
+          if (isMultiCol) extra.selectedColumns = multiColumns;
+          onApply(extra);
+        }}
+      >
+        Apply {mathDef.label}
+      </button>
+    </>
   );
 }
 

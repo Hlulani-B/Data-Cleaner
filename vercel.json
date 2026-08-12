@@ -20,6 +20,8 @@
     { "source": "/api/seperate", "destination": "/api/operations" },
     { "source": "/api/join", "destination": "/api/operations" },
     { "source": "/api/concatenate", "destination": "/api/operations" },
+    { "source": "/api/math", "destination": "/api/operations" },
+    { "source": "/api/absolute", "destination": "/api/operations" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

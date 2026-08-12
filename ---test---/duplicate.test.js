@@ -1,4 +1,4 @@
-import { Duplicate } from '../api/functions/automatic/duplicates';
+import { Duplicate } from '../src/functions/automatic/duplicates';
 import XLSX from 'xlsx';
 
 test('removes exact duplicate rows', () => {

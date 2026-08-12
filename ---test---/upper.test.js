@@ -1,4 +1,4 @@
-import { Upper } from '../api/functions/user_choice/upper';
+import { Upper } from '../src/functions/user_choice/upper';
 import XLSX from 'xlsx';
 
 test('converts column to uppercase', () => {

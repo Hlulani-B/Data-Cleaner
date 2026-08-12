@@ -1,4 +1,4 @@
-import { Proper } from '../api/functions/user_choice/proper';
+import { Proper } from '../src/functions/user_choice/proper';
 import XLSX from 'xlsx';
 
 test('capitalizes first letter of each word', () => {

@@ -1,4 +1,4 @@
-import { RemoveColumn } from '../api/functions/user_choice/removeColumn';
+import { RemoveColumn } from '../src/functions/user_choice/removeColumn';
 import XLSX from 'xlsx';
 
 test('removes specified column', () => {

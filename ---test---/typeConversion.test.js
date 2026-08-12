@@ -1,4 +1,4 @@
-import { TypeConversion } from '../api/functions/user_choice/typeConversion';
+import { TypeConversion } from '../src/functions/user_choice/typeConversion';
 import XLSX from 'xlsx';
 
 test('converts string column to number', () => {

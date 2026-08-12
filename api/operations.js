@@ -21,6 +21,8 @@ import { Datatype } from "../src/functions/automatic/datatype.js";
 import Separate from "../src/functions/user_choice/seperate.js";
 import Join from "../src/functions/user_choice/join.js";
 import Concatenate from "../src/functions/user_choice/concatenate.js";
+import MathOperations from "../src/functions/user_choice/math.js";
+import AbsoluteValue from "../src/functions/user_choice/absolute.js";
 
 function toSheet(data) { return XLSX.utils.json_to_sheet(data); }
 function toData(sheet) { return XLSX.utils.sheet_to_json(sheet); }
@@ -116,6 +118,49 @@ const ops = {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, sheet, "Sheet1");
     return XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  },
+
+  // ─── Math Operations ───
+  absolute({ data, column }) {
+    if (!column) throw new Error("column is required");
+    return toData(new AbsoluteValue().absolute(toSheet(data), column));
+  },
+
+  math({ data, mathOp, column, columnA, columnB, newColumn, paramValue, selectedColumns }) {
+    if (!mathOp) throw new Error("mathOp is required");
+    const m = new MathOperations();
+    const sheet = toSheet(data);
+    const pv = Number(paramValue);
+
+    switch (mathOp) {
+      // Single-column in-place
+      case "absolute": return toData(m.absolute(sheet, column));
+      case "ceil": return toData(m.ceil(sheet, column));
+      case "floor": return toData(m.floor(sheet, column));
+      case "negate": return toData(m.negate(sheet, column));
+      case "round": return toData(m.round(sheet, column, pv || 0));
+      case "addConstant": return toData(m.addConstant(sheet, column, pv || 0));
+      case "multiplyConstant": return toData(m.multiplyConstant(sheet, column, pv || 1));
+      // Single-column → new column
+      case "squareRoot": return toData(m.squareRoot(sheet, column, newColumn || "sqrt_result"));
+      case "power": return toData(m.power(sheet, column, pv || 2, newColumn || "power_result"));
+      case "log": return toData(m.log(sheet, column, newColumn || "log_result", pv || Math.E));
+      case "cumulativeSum": return toData(m.cumulativeSum(sheet, column, newColumn || "cumsum"));
+      // Two-column → new column
+      case "add": return toData(m.add(sheet, columnA, columnB, newColumn || "sum"));
+      case "subtract": return toData(m.subtract(sheet, columnA, columnB, newColumn || "difference"));
+      case "multiply": return toData(m.multiply(sheet, columnA, columnB, newColumn || "product"));
+      case "divide": return toData(m.divide(sheet, columnA, columnB, newColumn || "quotient"));
+      case "modulo": return toData(m.modulo(sheet, columnA, columnB, newColumn || "remainder"));
+      case "min": return toData(m.min(sheet, columnA, columnB, newColumn || "min_val"));
+      case "max": return toData(m.max(sheet, columnA, columnB, newColumn || "max_val"));
+      case "percentageOf": return toData(m.percentageOf(sheet, columnA, columnB, newColumn || "percentage"));
+      case "percentageChange": return toData(m.percentageChange(sheet, columnA, columnB, newColumn || "pct_change"));
+      // Multi-column → new column
+      case "sumColumns": return toData(m.sumColumns(sheet, selectedColumns || [], newColumn || "total"));
+      case "averageColumns": return toData(m.averageColumns(sheet, selectedColumns || [], newColumn || "average"));
+      default: throw new Error(`Unknown math operation: ${mathOp}`);
+    }
   },
 };
 

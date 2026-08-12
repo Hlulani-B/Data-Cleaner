@@ -1,4 +1,4 @@
-import { RemoveEmpty } from '../api/functions/user_choice/removeEmpty';
+import { RemoveEmpty } from '../src/functions/user_choice/removeEmpty';
 import XLSX from 'xlsx';
 
 test('removes rows where all values are empty', () => {

@@ -32,6 +32,17 @@ Applied individually after the initial clean. Some require a column or multi-col
 - **Join Columns** — combine multiple columns into one with a custom delimiter
 - **Concatenate Columns** — combine multiple columns into one, with an optional custom string appended
 
+#### Math Operations
+21 mathematical and statistical operations accessible via a single "Math Operations" card with a two-step modal (pick operation → configure columns/params):
+
+**Single-column (in-place):** Absolute Value, Ceiling, Floor, Negate, Round (with decimal places), Add Constant, Multiply Constant
+
+**Single-column (new column):** Square Root, Power (with exponent), Logarithm (with base), Cumulative Sum
+
+**Two-column (new column):** Add, Subtract, Multiply, Divide, Modulo, Min, Max, Percentage Of, Percentage Change
+
+**Multi-column (new column):** Sum Columns, Average Columns
+
 ### Empty Values Inspector
 Interactive view to inspect and remove rows with empty/missing data:
 - Color-coded table: red cells for empty values, yellow rows for rows with empties
@@ -39,6 +50,7 @@ Interactive view to inspect and remove rows with empty/missing data:
 - Batch actions: select all empty rows, select fully empty rows only, remove selected or all
 
 ### Other
+- **Neon Database Persistence** — files are saved to Neon Postgres on upload, synced on every operation, and loaded from Neon when revisiting
 - **Undo** — revert the last applied operation one step at a time
 - **Drafts** — saved versions of the sheet, most recent first, so you can jump back to any previous state
 - **Export** — download the current sheet as XLSX (client-side)
@@ -50,7 +62,7 @@ Interactive view to inspect and remove rows with empty/missing data:
 |--------------|----------------------------------------------------|
 | Frontend     | React 19, React Router 7, Vite 8                  |
 | Auth         | Firebase Authentication (Google Sign-In)           |
-| Backend      | Vercel serverless (3 functions) + Express dev server |
+| Backend      | Vercel serverless (4 functions) + Express dev server |
 | Database     | Neon Postgres (`@neondatabase/serverless`)         |
 | Spreadsheets | xlsx (client-side parsing and export)              |
 | AI           | OpenAI, Hugging Face, Google Gemini, Cerebras, Groq |
@@ -116,15 +128,18 @@ npm run preview   # preview the production build
 
 ## Architecture
 
-### Serverless Functions (3 total — Vercel free-tier compatible)
+### Serverless Functions (4 total — Vercel free-tier compatible)
+
+Vercel's free tier allows **12 serverless functions max**. Early in development, each cleaning operation was its own serverless function (18 total), which exceeded the limit. The solution: consolidate all data transforms into a single unified handler (`api/operations.js`) that dispatches based on the `operation` field. Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites.
 
 | Endpoint              | Handles                                           |
 |-----------------------|---------------------------------------------------|
-| `api/operations.js`   | All 16 data transforms (upper, lower, proper, clean, trim, duplicates, removeEmpty, removeColumn, missingValues, dateStandard, typeConversion, separate, join, concatenate, datatype, upload) |
+| `api/operations.js`   | All data transforms + 21 math operations (upper, lower, proper, clean, trim, duplicates, removeEmpty, removeColumn, missingValues, dateStandard, typeConversion, separate, join, concatenate, datatype, upload, math, absolute) |
+| `api/files.js`        | File CRUD in Neon Postgres (save, list, get, update, delete, versions) |
 | `api/auth.js`         | User registration in Neon Postgres                |
 | `api/ai.js`           | Multi-provider AI orchestration                   |
 
-Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites. The operations handler auto-detects the operation from the URL path.
+Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites. The operations handler auto-detects the operation from the URL path or the `operation` field in the request body.
 
 ### Dev Server
 
@@ -137,18 +152,20 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 ## Project Structure
 
 ```
-├── api/                          # Serverless API (3 functions)
+├── api/                          # Serverless API (4 functions)
 │   ├── functions/
 │   │   ├── automatic/            # Auto-applied operations (trim, clean, duplicates, datatype)
-│   │   └── user_choice/          # User-selected operations (case, dates, types, separate, join, etc.)
+│   │   └── user_choice/          # User-selected operations (case, dates, types, separate, join, math, etc.)
 │   ├── database/
 │   │   └── neon.js               # Neon Postgres database class with ensureTables()
-│   ├── operations.js             # Unified handler for all data transforms
+│   ├── operations.js             # Unified handler for all data + math transforms
+│   ├── files.js                  # File CRUD (save/list/get/update/delete/versions)
 │   ├── auth.js                   # User registration endpoint
 │   └── ai.js                     # Multi-provider AI orchestration
 ├── server/
 │   └── index.js                  # Express dev server (API + Vite middleware)
 ├── src/
+│   ├── functions/                # Server-side operation classes (automatic + user_choice)
 │   ├── Components/
 │   │   ├── login.jsx             # Login page — Google sign-in + Neon registration
 │   │   ├── dashboard.jsx         # Dashboard — upload + file cards + Neon sync

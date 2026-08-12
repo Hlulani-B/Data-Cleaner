@@ -1,4 +1,4 @@
-import { Lower } from '../api/functions/user_choice/lower';
+import { Lower } from '../src/functions/user_choice/lower';
 import XLSX from 'xlsx';
 
 test('converts column to lowercase', () => {

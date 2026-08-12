@@ -1,4 +1,4 @@
-import { Clean } from '../api/functions/automatic/clean';
+import { Clean } from '../src/functions/automatic/clean';
 import XLSX from 'xlsx';
 
 test('removes fully empty rows', () => {
