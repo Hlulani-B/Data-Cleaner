@@ -3,8 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
 import { Values } from "../functions/user_choice/getValues";
+import { Clean } from "../functions/automatic/clean";
 import {
-  trimData, cleanData, removeDuplicates, detectDatatypes,
+  removeDuplicates, detectDatatypes,
   removeEmptyRows, fillEmptyValues, lowercaseColumn, uppercaseColumn, properCaseColumn,
   removeColumn, standardizeDates, convertType,
   splitColumn, joinColumns, concatenateColumns,
@@ -362,24 +363,25 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     setHistory((prev) => [...prev, JSON.parse(JSON.stringify(data))]);
   };
 
-  // Save a draft snapshot
-  const saveDraft = (label) => {
+  // Save a draft snapshot (pass explicit data to avoid stale state)
+  const saveDraft = (label, draftData = data) => {
     setDrafts((prev) => [
-      { label, data: JSON.parse(JSON.stringify(data)), timestamp: Date.now() },
+      { label, data: JSON.parse(JSON.stringify(draftData)), timestamp: Date.now() },
       ...prev,
     ]);
   };
 
-  /* ─── Initial Clean (client-side: trim + clean + duplicates + datatype) ─── */
+  /* ─── Initial Clean (uses Clean.clean like the API, then dedup + datatypes) ─── */
   const runInitialClean = () => {
     pushHistory();
-    const original = JSON.parse(JSON.stringify(data));
-    let current = JSON.parse(JSON.stringify(data));
+    const beforeRows = data.length;
 
-    const beforeRows = current.length;
-    current = trimData(current);
-    current = cleanData(current);
+    // Use the same Clean class the backend uses for /api/operations clean.
+    const sheet = XLSX.utils.json_to_sheet(data);
+    const cleanedSheet = new Clean().clean(sheet);
+    let current = XLSX.utils.sheet_to_json(cleanedSheet, { defval: "" });
     const afterClean = current.length;
+
     current = removeDuplicates(current);
     const afterDedup = current.length;
     current = detectDatatypes(current);
@@ -389,7 +391,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
 
     setData(current);
     persistFile(current);
-    saveDraft("Initial Clean");
+    saveDraft("Initial Clean", current);
     setInitialCleanDone(true);
 
     // Persist clean-done flag so it never runs again for this file + sheet
