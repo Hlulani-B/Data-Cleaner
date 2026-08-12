@@ -27,6 +27,8 @@ Applied individually after the initial clean. Some require a column or multi-col
 - **Date Standardization** — reformat a date column (YYYY-MM-DD, MM/DD/YYYY, DD-MM-YYYY)
 - **Type Conversion** — cast a column to number, string, or boolean
 - **Separate Column** — split one column into two by a delimiter and occurrence position
+- **Get Values** — extract unique values from a column; replace exact values; rewrite cell substrings
+- **Replace** — find and replace cell values across a column
 
 #### Multi-Column
 - **Join Columns** — combine multiple columns into one with a custom delimiter
@@ -48,6 +50,12 @@ Interactive view to inspect and remove rows with empty/missing data:
 - Color-coded table: red cells for empty values, yellow rows for rows with empties
 - Stats dashboard: total rows, rows with empty cells, fully empty rows, total empty cells
 - Batch actions: select all empty rows, select fully empty rows only, remove selected or all
+
+### Search
+- **Search Bar** — sits at the top of every sheet view; filters rows in real time by typing any keyword
+- Case-insensitive, searches across all columns simultaneously
+- Matching cells are highlighted; a live row count shows how many rows match
+- Resets automatically when switching sheets
 
 ### Other
 - **Neon Database Persistence** — files are saved to Neon Postgres on upload, synced on every operation, and loaded from Neon when revisiting
@@ -119,6 +127,8 @@ npm run dev:client
 npm test
 ```
 
+190 tests across 20 suites covering all automatic and user-choice functions.
+
 ## Build
 
 ```bash
@@ -165,11 +175,11 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 ├── server/
 │   └── index.js                  # Express dev server (API + Vite middleware)
 ├── src/
-│   ├── functions/                # Server-side operation classes (automatic + user_choice)
+│   ├── functions/                # Client-side operation classes (automatic + user_choice; incl. getValues, search)
 │   ├── Components/
 │   │   ├── login.jsx             # Login page — Google sign-in + Neon registration
 │   │   ├── dashboard.jsx         # Dashboard — upload + file cards + Neon sync
-│   │   ├── excel_file.jsx        # Excel view — sheet sidebar, functions, modals
+│   │   ├── excel_file.jsx        # Excel/CSV shared view — search bar, sheet sidebar, functions, modals
 │   │   ├── csv_file.jsx          # CSV view — single sheet + functions
 │   │   └── emptyvalues.jsx       # Empty values inspector component
 │   ├── utils/
@@ -187,6 +197,6 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 
 Four tables — **Users**, **Files**, **File_Versions**, and **Graphs** — track users, uploaded files, version history (drafts/undo), and chart images. Tables auto-create on first request via `ensureTables()`. See [database_schema.md](database_schema.md) for full details.
 
-## Flow
+**Flow**
 
-**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → Apply functions (column picker or multi-column modal) → Inspect **Empty Values** → View drafts and undo changes → **Export** as XLSX.
+**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → **Search** rows in real time via the search bar → Apply functions (column picker or multi-column modal) → Inspect **Empty Values** → View drafts and undo changes → **Export** as XLSX.
