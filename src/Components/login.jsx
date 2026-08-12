@@ -14,10 +14,29 @@ function Login() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+
       // Store user info in localStorage
       localStorage.setItem("dc_username", user.displayName || user.email);
       localStorage.setItem("dc_userEmail", user.email);
       localStorage.setItem("dc_userPhoto", user.photoURL || "");
+
+      // Register user in Neon database
+      try {
+        const res = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user.email,
+            name: user.displayName || user.email.split("@")[0],
+          }),
+        });
+        if (!res.ok) {
+          console.warn("Failed to register user in database:", await res.text());
+        }
+      } catch (dbErr) {
+        console.warn("Database registration skipped:", dbErr.message);
+      }
+
       navigate("/");
     } catch (err) {
       if (err.code !== "auth/popup-closed-by-user") {

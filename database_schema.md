@@ -30,3 +30,12 @@ Same columns as Files, plus a link back to the original file and a position for 
 | user      | VARCHAR(255) / UUID     | FOREIGN KEY -> Users(email)   |
 | file_id   | INTEGER / UUID         | FOREIGN KEY -> Files(id)      |
 | position  | INTEGER                | NOT NULL — 1 = first/original version, higher number = more recent |
+
+## Graphs Table
+
+| Column      | Type                  | Constraints                   |
+|-------------|-----------------------|--------------------------------|
+| id          | INTEGER / UUID         | PRIMARY KEY                   |
+| file_id     | INTEGER / UUID         | FOREIGN KEY -> Files(id)      |
+| sheet_number| INTEGER                | Sheet index (only used if filetype is 'excel', null for CSV) |
+| image_path  | VARCHAR(500)           | NOT NULL — path to the saved chart image |

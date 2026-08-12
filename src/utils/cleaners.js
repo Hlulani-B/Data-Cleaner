@@ -145,6 +145,58 @@ export function standardizeDates(data, column, format = "YYYY-MM-DD") {
   });
 }
 
+/** Split a column into two columns by delimiter */
+export function splitColumn(data, column, delimiter, occurrence, newCol1, newCol2) {
+  return data.map((row) => {
+    const out = { ...row };
+    const original = String(out[column] ?? "");
+    const parts = original.split(delimiter);
+
+    if (parts.length > occurrence) {
+      out[newCol1] = parts.slice(0, occurrence).join(delimiter);
+      out[newCol2] = parts.slice(occurrence).join(delimiter);
+    } else {
+      out[newCol1] = original;
+      out[newCol2] = "";
+    }
+
+    delete out[column];
+    return out;
+  });
+}
+
+/** Join multiple columns into one with a delimiter */
+export function joinColumns(data, columns, newColumn, delimiter) {
+  return data.map((row) => {
+    const out = { ...row };
+    const value = columns
+      .map((col) => (Object.keys(row).includes(col) ? String(row[col] ?? "") : ""))
+      .join(delimiter);
+    out[newColumn] = value;
+    return out;
+  });
+}
+
+/** Concatenate multiple columns into one without a delimiter, with optional custom string */
+export function concatenateColumns(data, columns, newColumn, customString = "") {
+  return data.map((row) => {
+    const out = { ...row };
+    let value = "";
+    columns.forEach((col) => {
+      if (Object.keys(row).includes(col)) {
+        value += String(row[col] ?? "");
+      } else {
+        value += col;
+      }
+    });
+    if (customString) {
+      value += customString;
+    }
+    out[newColumn] = value;
+    return out;
+  });
+}
+
 /** Convert column type */
 export function convertType(data, column, targetType) {
   return data.map((row) => {

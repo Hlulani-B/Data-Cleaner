@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import * as XLSX from "xlsx";
+import EmptyValues from "./emptyvalues";
 import {
   trimData, cleanData, removeDuplicates, detectDatatypes,
   removeEmptyRows, lowercaseColumn, uppercaseColumn, properCaseColumn,
   removeColumn, standardizeDates, convertType,
+  splitColumn, joinColumns, concatenateColumns,
 } from "../utils/cleaners";
 
 /* ─── Client-side function runners ─── */
@@ -17,6 +19,16 @@ const FUNCTION_RUNNERS = {
   removeColumn: (data, col) => removeColumn(data, col),
   dateStandard: (data, col, extra) => standardizeDates(data, col, extra.format || "YYYY-MM-DD"),
   typeConversion: (data, col, extra) => convertType(data, col, extra.targetType || "string"),
+  separate: (data, col, extra) => splitColumn(
+    data, col, extra.delimiter || ",", Number(extra.occurrence) || 1,
+    extra.newColumn1 || `${col}_1`, extra.newColumn2 || `${col}_2`
+  ),
+  join: (data, _col, extra) => joinColumns(
+    data, extra.selectedColumns || [], extra.newColumn || "joined", extra.delimiter || " "
+  ),
+  concatenate: (data, _col, extra) => concatenateColumns(
+    data, extra.selectedColumns || [], extra.newColumn || "concatenated", extra.customString || ""
+  ),
 };
 
 const FUNCTIONS = [
@@ -28,6 +40,9 @@ const FUNCTIONS = [
   { key: "removeColumn", label: "Remove Column", desc: "Delete a column from the dataset", needsColumn: true },
   { key: "dateStandard", label: "Date Standardize", desc: "Standardize date format in a column", needsColumn: true },
   { key: "typeConversion", label: "Type Conversion", desc: "Convert column values to number, string, or boolean", needsColumn: true },
+  { key: "separate", label: "Separate Column", desc: "Split one column into two by a delimiter", needsColumn: true },
+  { key: "join", label: "Join Columns", desc: "Combine multiple columns with a delimiter", needsColumn: false, multiColumn: true },
+  { key: "concatenate", label: "Concatenate Columns", desc: "Combine multiple columns without a delimiter", needsColumn: false, multiColumn: true },
 ];
 
 /* ─── Shared FileView component (used by both Excel and CSV) ─── */
@@ -40,7 +55,9 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [error, setError] = useState(null);
   const [columnPicker, setColumnPicker] = useState(null); // { funcKey, endpoint }
   const [cleanStats, setCleanStats] = useState(null);
-  const [extraParams, setExtraParams] = useState({}); // for date format, type target
+  const [extraParams, setExtraParams] = useState({}); // for date format, type target, separate params, etc.
+  const [multiColumns, setMultiColumns] = useState([]); // for join / concatenate multi-column selection
+  const [showEmptyValues, setShowEmptyValues] = useState(false); // toggle empty values inspector
 
   // Load sheet data when sheet changes
   useEffect(() => {
@@ -49,7 +66,11 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       setData(sheetData);
       setHistory([]);
       setDrafts([]);
-      setInitialCleanDone(false);
+      // Check persisted clean-done flag for this file + sheet
+      const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
+      const found = stored.find((f) => f.id === file.id);
+      const cleaned = found?.initialCleaned?.[activeSheet] || false;
+      setInitialCleanDone(cleaned);
     }
   }, [file, activeSheet]);
 
@@ -104,6 +125,15 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     persistFile(current);
     saveDraft("Initial Clean");
     setInitialCleanDone(true);
+
+    // Persist clean-done flag so it never runs again for this file + sheet
+    const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
+    const idx = stored.findIndex((f) => f.id === file.id);
+    if (idx !== -1) {
+      if (!stored[idx].initialCleaned) stored[idx].initialCleaned = {};
+      stored[idx].initialCleaned[activeSheet] = true;
+      localStorage.setItem("dc_files", JSON.stringify(stored));
+    }
     setCleanStats({
       rowsBefore: beforeRows,
       rowsAfter: current.length,
@@ -147,7 +177,10 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
 
   /* ─── Handle function card click ─── */
   const handleFuncClick = (funcDef) => {
-    if (funcDef.needsColumn) {
+    if (funcDef.multiColumn) {
+      setColumnPicker({ funcKey: funcDef.key, label: funcDef.label, multiColumn: true });
+      setMultiColumns([]);
+    } else if (funcDef.needsColumn) {
       setColumnPicker({ funcKey: funcDef.key, endpoint: funcDef.endpoint, label: funcDef.label });
     } else {
       applyFunction(funcDef);
@@ -208,34 +241,47 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
             </div>
           )}
 
-          {/* Data Table */}
-          <div className="table-wrap">
-            {data.length > 0 ? (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    {columns.map((col) => (
-                      <th key={col}>{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.slice(0, 10).map((row, i) => (
-                    <tr key={i}>
+          {/* Data Table / Empty Values Inspector */}
+          {showEmptyValues ? (
+            <EmptyValues
+              data={data}
+              onUpdate={(newData) => {
+                pushHistory();
+                setData(newData);
+                persistFile(newData);
+                saveDraft("Remove Empty Values");
+              }}
+              onBack={() => setShowEmptyValues(false)}
+            />
+          ) : (
+            <div className="table-wrap">
+              {data.length > 0 ? (
+                <table className="data-table">
+                  <thead>
+                    <tr>
                       {columns.map((col) => (
-                        <td key={col}>{row[col] != null ? String(row[col]) : ""}</td>
+                        <th key={col}>{col}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="empty-msg">No data to display</p>
-            )}
-            {data.length > 10 && (
-              <p className="truncation-note">Showing first 10 of {data.length} rows</p>
-            )}
-          </div>
+                  </thead>
+                  <tbody>
+                    {data.slice(0, 10).map((row, i) => (
+                      <tr key={i}>
+                        {columns.map((col) => (
+                          <td key={col}>{row[col] != null ? String(row[col]) : ""}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="empty-msg">No data to display</p>
+              )}
+              {data.length > 10 && (
+                <p className="truncation-note">Showing first 10 of {data.length} rows</p>
+              )}
+            </div>
+          )}
 
           {/* Clean Results Banner */}
           {cleanStats && (
@@ -275,6 +321,15 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               <section className="functions-section">
                 <h3 className="section-heading">Functions</h3>
                 <div className="functions-grid">
+                  {/* Empty Values Inspector */}
+                  <button
+                    className="func-card"
+                    onClick={() => setShowEmptyValues(true)}
+                    disabled={loading}
+                  >
+                    <span className="func-name">Empty Values</span>
+                    <span className="func-desc">Inspect & remove rows with empty cells</span>
+                  </button>
                   {FUNCTIONS.map((fn) => (
                     <button
                       key={fn.key}
@@ -317,27 +372,126 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
 
       {/* Column Picker Modal */}
       {columnPicker && (
-        <div className="modal-overlay" onClick={() => { setColumnPicker(null); setExtraParams({}); }}>
+        <div className="modal-overlay" onClick={() => { setColumnPicker(null); setExtraParams({}); setMultiColumns([]); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">
-              {columnPicker.label} — Choose a column
+              {columnPicker.label}{columnPicker.multiColumn ? " — Choose columns" : " — Choose a column"}
             </h3>
-            <div className="column-grid">
-              {columns.map((col) => (
+
+            {/* ── Multi-column selection (join / concatenate) ── */}
+            {columnPicker.multiColumn ? (
+              <>
+                <p className="modal-hint">Select two or more columns</p>
+                <div className="column-grid">
+                  {columns.map((col) => {
+                    const selected = multiColumns.includes(col);
+                    return (
+                      <button
+                        key={col}
+                        className={`column-chip ${selected ? "selected" : ""}`}
+                        onClick={() =>
+                          setMultiColumns((prev) =>
+                            selected ? prev.filter((c) => c !== col) : [...prev, col]
+                          )
+                        }
+                      >
+                        {col}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {multiColumns.length >= 2 && (
+                  <div className="selected-columns-preview">
+                    <strong>Selected:</strong> {multiColumns.join(", ")}
+                  </div>
+                )}
+
+                {/* Join extra params */}
+                {columnPicker.funcKey === "join" && (
+                  <div className="extra-params">
+                    <label>
+                      Delimiter:
+                      <input
+                        type="text"
+                        value={extraParams.delimiter ?? " "}
+                        onChange={(e) => setExtraParams({ ...extraParams, delimiter: e.target.value })}
+                        placeholder=" "
+                      />
+                    </label>
+                    <label>
+                      New column name:
+                      <input
+                        type="text"
+                        value={extraParams.newColumn ?? "joined"}
+                        onChange={(e) => setExtraParams({ ...extraParams, newColumn: e.target.value })}
+                        placeholder="joined"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {/* Concatenate extra params */}
+                {columnPicker.funcKey === "concatenate" && (
+                  <div className="extra-params">
+                    <label>
+                      Custom string (optional):
+                      <input
+                        type="text"
+                        value={extraParams.customString ?? ""}
+                        onChange={(e) => setExtraParams({ ...extraParams, customString: e.target.value })}
+                        placeholder="e.g. - or _"
+                      />
+                    </label>
+                    <label>
+                      New column name:
+                      <input
+                        type="text"
+                        value={extraParams.newColumn ?? "concatenated"}
+                        onChange={(e) => setExtraParams({ ...extraParams, newColumn: e.target.value })}
+                        placeholder="concatenated"
+                      />
+                    </label>
+                  </div>
+                )}
+
                 <button
-                  key={col}
-                  className="column-chip"
+                  className="primary-btn modal-apply-btn"
+                  disabled={multiColumns.length < 2}
                   onClick={() => {
                     const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
-                    applyFunction(fn, col, extraParams);
+                    applyFunction(fn, null, { ...extraParams, selectedColumns: multiColumns });
                   }}
                 >
-                  {col}
+                  Apply
                 </button>
-              ))}
-            </div>
+              </>
+            ) : (
+              <>
+                {/* ── Single-column selection ── */}
+                <div className="column-grid">
+                  {columns.map((col) => (
+                    <button
+                      key={col}
+                      className="column-chip"
+                      onClick={() => {
+                        const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
+                        if (fn.key === "separate") {
+                          // Open extra params instead of applying immediately
+                          setColumnPicker((prev) => ({ ...prev, selectedColumn: col, showParams: true }));
+                        } else {
+                          applyFunction(fn, col, extraParams);
+                        }
+                      }}
+                    >
+                      {col}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
-            {/* Extra params for specific functions */}
+            {/* Extra params for specific single-column functions */}
             {columnPicker.funcKey === "dateStandard" && (
               <div className="extra-params">
                 <label>Date Format:</label>
@@ -366,7 +520,59 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               </div>
             )}
 
-            <button className="modal-close" onClick={() => { setColumnPicker(null); setExtraParams({}); }}>
+            {/* Separate column extra params */}
+            {columnPicker.funcKey === "separate" && columnPicker.showParams && (
+              <div className="extra-params">
+                <p className="modal-hint">Splitting column: <strong>{columnPicker.selectedColumn}</strong></p>
+                <label>
+                  Delimiter:
+                  <input
+                    type="text"
+                    value={extraParams.delimiter ?? ","}
+                    onChange={(e) => setExtraParams({ ...extraParams, delimiter: e.target.value })}
+                    placeholder=","
+                  />
+                </label>
+                <label>
+                  Occurrence (split at Nth delimiter):
+                  <input
+                    type="number"
+                    min="1"
+                    value={extraParams.occurrence ?? 1}
+                    onChange={(e) => setExtraParams({ ...extraParams, occurrence: e.target.value })}
+                  />
+                </label>
+                <label>
+                  New column 1 name:
+                  <input
+                    type="text"
+                    value={extraParams.newColumn1 ?? `${columnPicker.selectedColumn || ""}_1`}
+                    onChange={(e) => setExtraParams({ ...extraParams, newColumn1: e.target.value })}
+                    placeholder={`${columnPicker.selectedColumn}_1`}
+                  />
+                </label>
+                <label>
+                  New column 2 name:
+                  <input
+                    type="text"
+                    value={extraParams.newColumn2 ?? `${columnPicker.selectedColumn || ""}_2`}
+                    onChange={(e) => setExtraParams({ ...extraParams, newColumn2: e.target.value })}
+                    placeholder={`${columnPicker.selectedColumn}_2`}
+                  />
+                </label>
+                <button
+                  className="primary-btn modal-apply-btn"
+                  onClick={() => {
+                    const fn = FUNCTIONS.find((f) => f.key === "separate");
+                    applyFunction(fn, columnPicker.selectedColumn, extraParams);
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+
+            <button className="modal-close" onClick={() => { setColumnPicker(null); setExtraParams({}); setMultiColumns([]); }}>
               Cancel
             </button>
           </div>

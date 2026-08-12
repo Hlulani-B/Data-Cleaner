@@ -3,6 +3,44 @@ import { neon } from "@neondatabase/serverless";
 const sql = neon(process.env.DATABASE_URL);
 
 export class Database {
+  // Create tables if they don't exist yet
+  async ensureTables() {
+    await sql`
+      CREATE TABLE IF NOT EXISTS Users (
+        email VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS Files (
+        id SERIAL PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        filetype VARCHAR(10) NOT NULL CHECK (filetype IN ('csv', 'excel')),
+        file_path VARCHAR(500) NOT NULL,
+        "user" VARCHAR(255) REFERENCES Users(email)
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS File_Versions (
+        id SERIAL PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        filetype VARCHAR(10) NOT NULL CHECK (filetype IN ('csv', 'excel')),
+        file_path VARCHAR(500) NOT NULL,
+        "user" VARCHAR(255) REFERENCES Users(email),
+        file_id INTEGER REFERENCES Files(id),
+        position INTEGER NOT NULL
+      )
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS Graphs (
+        id SERIAL PRIMARY KEY,
+        file_id INTEGER REFERENCES Files(id),
+        sheet_number INTEGER,
+        image_path VARCHAR(500) NOT NULL
+      )
+    `;
+  }
+
   // Get a single file by id
   async getFile(fileId) {
     const rows = await sql`

@@ -19,6 +19,16 @@ function Dashboard() {
     if (name) setUsername(name);
     const photo = localStorage.getItem("dc_userPhoto");
     if (photo) setUserPhoto(photo);
+
+    // Ensure user is registered in Neon (covers page-refresh / returning users)
+    const email = localStorage.getItem("dc_userEmail");
+    if (email) {
+      fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name: name || email.split("@")[0] }),
+      }).catch(() => {}); // silent — registration is best-effort
+    }
   }, []);
 
   const saveFiles = (updated) => {

@@ -1,8 +1,11 @@
 # Data-Cleaner
 
-A full-stack web application for cleaning and processing CSV/XLSX files. Upload a spreadsheet, run an initial automatic clean, then apply individual cleaning functions — with undo and draft history.
+A full-stack web application for cleaning and processing CSV/XLSX files. Sign in with Google, upload a spreadsheet, run an automatic initial clean, then apply individual cleaning functions — with undo and draft history.
 
 ## Features
+
+### Authentication
+- **Google Sign-In** via Firebase — protects all routes behind a login screen
 
 ### Automatic Cleaning (Initial Clean)
 Bundled into one action that must be run before other functions unlock:
@@ -10,6 +13,8 @@ Bundled into one action that must be run before other functions unlock:
 - **Clean** — removes empty rows, trims strings, normalizes nulls
 - **Remove Duplicates** — removes exact duplicate rows
 - **Datatype Detection** — coerces numeric strings to numbers
+
+Results are shown in a dismissible banner with row counts and stats.
 
 ### User-Selected Functions
 Applied individually after the initial clean. Some require a column parameter:
@@ -23,19 +28,21 @@ Applied individually after the initial clean. Some require a column parameter:
 ### Other
 - **Undo** — revert the last applied operation one step at a time
 - **Drafts** — saved versions of the sheet, most recent first, so you can jump back to any previous state
+- **Export** — download the current sheet as XLSX (client-side)
 - **AI Assistance** — multi-provider AI orchestration (OpenAI, Hugging Face, Gemini, Cerebras, Groq) with rate-limit handling and cooldowns
 
 ## Tech Stack
 
-| Layer      | Technology                              |
-|------------|-----------------------------------------|
-| Frontend   | React 19, React Router 7, Vite 8       |
-| Backend    | Vercel serverless API routes (`api/`)   |
-| Database   | Neon Postgres (`@neondatabase/serverless`) |
-| Spreadsheets | xlsx                                  |
-| AI         | OpenAI, Hugging Face, Google Gemini, Cerebras, Groq |
-| Testing    | Jest (with experimental VM modules)      |
-| Linting    | Oxlint                                   |
+| Layer        | Technology                                         |
+|--------------|----------------------------------------------------|
+| Frontend     | React 19, React Router 7, Vite 8                  |
+| Auth         | Firebase Authentication (Google Sign-In)           |
+| Backend      | Vercel serverless API routes (`api/`)              |
+| Database     | Neon Postgres (`@neondatabase/serverless`)         |
+| Spreadsheets | xlsx (client-side parsing and export)              |
+| AI           | OpenAI, Hugging Face, Google Gemini, Cerebras, Groq |
+| Testing      | Jest (with experimental VM modules)                |
+| Linting      | Oxlint                                             |
 
 ## Setup
 
@@ -43,26 +50,35 @@ Applied individually after the initial clean. Some require a column parameter:
 npm install
 ```
 
-Set the following environment variables for database and AI features:
+Create a `.env` file with the following variables:
 
 ```
-DATABASE_URL=         # Neon Postgres connection string
-OPENAI_API_KEY=       # OpenAI API key
-HUGGINGFACE_API_KEY=  # Hugging Face Inference API key
-GOOGLE_AI_API_KEY=    # Google Generative AI API key
-CEREBRAS_API_KEY=     # Cerebras Cloud API key
-GROQ_API_KEY=         # Groq API key
+# Database & AI (server-side)
+DATABASE_URL=             # Neon Postgres connection string
+OPENAI_API_KEY=           # OpenAI API key
+HUGGINGFACE_API_KEY=      # Hugging Face Inference API key
+GOOGLE_AI_API_KEY=        # Google Generative AI API key
+CEREBRAS_API_KEY=         # Cerebras Cloud API key
+GROQ_API_KEY=             # Groq API key
+
+# Firebase (client-side, VITE_ prefix required)
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
 ```
 
 ## Run
 
-Start the frontend dev server (proxies `/api` calls to `localhost:3000`):
+Start the frontend dev server:
 
 ```bash
 npm run dev
 ```
 
-Start the API server separately on port 3000 (e.g. with `vercel dev` or a custom Express wrapper).
+Cleaning operations run entirely client-side — no separate API server needed for core functionality. Start the API server separately (e.g. `vercel dev`) only for AI assistance features.
 
 ## Tests
 
@@ -92,10 +108,14 @@ npm run preview   # preview the production build
 │   └── [operation].js            # One endpoint per cleaning function
 ├── src/
 │   ├── Components/
+│   │   ├── login.jsx             # Login page — Google sign-in
 │   │   ├── dashboard.jsx         # Dashboard — upload + file cards
 │   │   ├── excel_file.jsx        # Excel file view — sheet sidebar + functions
 │   │   └── csv_file.jsx          # CSV file view — single sheet + functions
-│   ├── App.jsx                   # React Router setup
+│   ├── utils/
+│   │   └── cleaners.js           # Client-side cleaning utilities
+│   ├── firebase.js               # Firebase config + auth exports
+│   ├── App.jsx                   # React Router + auth guards
 │   └── main.jsx                  # Entry point
 ├── ---test---/                   # Jest test files
 ├── wireframes.md                 # UI wireframes
@@ -109,4 +129,4 @@ Three tables — **Users**, **Files**, and **File_Versions** — track uploaded 
 
 ## Flow
 
-Dashboard → Upload or open a file → Excel view (sheet sidebar) or CSV view (single sheet) → Run **Initial Clean** → Functions page unlocks → Apply functions → View drafts and undo changes.
+**Login** (Google sign-in) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** → Results banner + functions unlock → Apply functions → View drafts and undo changes.
