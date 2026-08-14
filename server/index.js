@@ -14,15 +14,17 @@ async function start() {
   app.use(express.json({ limit: "50mb" }));
 
   // ─── Dynamically import API handlers (after env is loaded) ───
-  const [operationsMod, authMod, filesMod] = await Promise.all([
+  const [operationsMod, authMod, filesMod, chartsMod] = await Promise.all([
     import("../api/operations.js"),
     import("../api/auth.js"),
     import("../api/files.js"),
+    import("../api/charts.js"),
   ]);
 
   const operations = operationsMod.default;
   const auth = authMod.default;
   const files = filesMod.default;
+  const charts = chartsMod.default;
 
   // ai.js depends on optional packages — load gracefully
   let ai = null;
@@ -45,6 +47,7 @@ async function start() {
   app.all("/api/operations", (req, res) => operations(req, res));
   app.all("/api/auth", (req, res) => auth(req, res));
   app.all("/api/files", (req, res) => files(req, res));
+  app.all("/api/charts", (req, res) => charts(req, res));
   if (ai) {
     app.all("/api/ai", (req, res) => ai(req, res));
   }

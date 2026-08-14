@@ -58,14 +58,26 @@ export default function ChartViewer({ type, params, apiUrl = "/api/charts" }) {
           body: JSON.stringify({ chart: type, ...params }),
         });
 
+        if (cancelled) return;
+
+        // Check response status before parsing JSON
+        if (!res.ok) {
+          // Try to parse error message from JSON, fallback to text
+          let errorMsg = "Something went wrong generating this chart";
+          try {
+            const json = await res.json();
+            errorMsg = json.error || errorMsg;
+          } catch {
+            // Response is not JSON, use status text
+            errorMsg = res.statusText || errorMsg;
+          }
+          setError(errorMsg);
+          return;
+        }
+
         const json = await res.json();
 
         if (cancelled) return;
-
-        if (!res.ok) {
-          setError(json.error || "Something went wrong generating this chart");
-          return;
-        }
 
         // functions can return a plain string when validation fails (e.g. wrong column type)
         if (typeof json.data === "string") {
