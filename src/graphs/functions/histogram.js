@@ -24,11 +24,17 @@ export async function histogram(sheet, column, email, description, binCount = 10
         return "No data available to generate chart";
     }
 
-    if (typeof data[0][column] !== 'number') {
+    // Check majority type instead of just first row
+    const sampleSize = Math.min(data.length, 100);
+    let numCount = 0;
+    for (let i = 0; i < sampleSize; i++) {
+        if (typeof data[i][column] === 'number') numCount++;
+    }
+    if (numCount < sampleSize * 0.5) {
         return "This column is not of number type, Please choose another column"
     }
 
-    const numbers = data.map(row => row[column]).filter(val => typeof val === 'number');
+    const numbers = data.map(row => row[column]).filter(val => typeof val === 'number' && !isNaN(val));
 
     if (numbers.length === 0) {
         return "No numeric values found in this column";

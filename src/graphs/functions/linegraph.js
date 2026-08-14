@@ -15,12 +15,18 @@ export async function lineGraph(sheet, xColumn, yColumn, email, description) {
         return "No data available to generate chart";
     }
 
-    if (typeof data[0][yColumn] !== 'number') {
+    // Check majority type instead of just first row
+    const sampleSize = Math.min(data.length, 100);
+    let numCount = 0;
+    for (let i = 0; i < sampleSize; i++) {
+        if (typeof data[i][yColumn] === 'number') numCount++;
+    }
+    if (numCount < sampleSize * 0.5) {
         return "Y column must be of number type, Please choose another column"
     }
 
     const points = data
-        .filter(row => row[xColumn] !== undefined && typeof row[yColumn] === 'number')
+        .filter(row => row[xColumn] !== undefined && row[xColumn] !== null && typeof row[yColumn] === 'number' && !isNaN(row[yColumn]))
         .map(row => ({
             x: row[xColumn],
             y: row[yColumn]

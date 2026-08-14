@@ -15,12 +15,18 @@ export async function bubbleChart(sheet, xColumn, yColumn, sizeColumn, email, de
         return "No data available to generate chart";
     }
 
-    if (typeof data[0][xColumn] !== 'number' || typeof data[0][yColumn] !== 'number' || typeof data[0][sizeColumn] !== 'number') {
+    // Check majority type instead of just first row
+    const sampleSize = Math.min(data.length, 100);
+    let numCount = 0;
+    for (let i = 0; i < sampleSize; i++) {
+        if (typeof data[i][xColumn] === 'number' && typeof data[i][yColumn] === 'number' && typeof data[i][sizeColumn] === 'number') numCount++;
+    }
+    if (numCount < sampleSize * 0.5) {
         return "All three columns must be of number type, Please choose another column"
     }
 
     const points = data
-        .filter(row => typeof row[xColumn] === 'number' && typeof row[yColumn] === 'number' && typeof row[sizeColumn] === 'number')
+        .filter(row => typeof row[xColumn] === 'number' && !isNaN(row[xColumn]) && typeof row[yColumn] === 'number' && !isNaN(row[yColumn]) && typeof row[sizeColumn] === 'number' && !isNaN(row[sizeColumn]))
         .map(row => ({ x: row[xColumn], y: row[yColumn], z: row[sizeColumn] }));
 
     let chartMeta = {

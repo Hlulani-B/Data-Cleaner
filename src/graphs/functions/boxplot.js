@@ -25,7 +25,13 @@ export async function boxPlot(sheet, categoryColumn, valueColumn, email, descrip
         return "No data available to generate chart";
     }
 
-    if (typeof data[0][valueColumn] !== 'number') {
+    // Check majority type instead of just first row
+    const sampleSize = Math.min(data.length, 100);
+    let numCount = 0;
+    for (let i = 0; i < sampleSize; i++) {
+        if (typeof data[i][valueColumn] === 'number') numCount++;
+    }
+    if (numCount < sampleSize * 0.5) {
         return "Value column must be of number type, Please choose another column"
     }
 

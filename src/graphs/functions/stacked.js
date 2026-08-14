@@ -15,7 +15,14 @@ export async function stackedBar(sheet, categoryColumn, groupColumn, email, desc
         return "No data available to generate chart";
     }
 
-    if (typeof data[0][categoryColumn] !== 'string' || typeof data[0][groupColumn] !== 'string') {
+    // Check majority type instead of just first row
+    const sampleSize = Math.min(data.length, 100);
+    let catStrCount = 0, grpStrCount = 0;
+    for (let i = 0; i < sampleSize; i++) {
+        if (typeof data[i][categoryColumn] === 'string') catStrCount++;
+        if (typeof data[i][groupColumn] === 'string') grpStrCount++;
+    }
+    if (catStrCount < sampleSize * 0.5 || grpStrCount < sampleSize * 0.5) {
         return "Both columns must be of string type, Please choose another column"
     }
 

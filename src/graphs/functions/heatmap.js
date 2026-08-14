@@ -28,15 +28,21 @@ export async function heatmap(sheet, columns, email, description) {
         return "No data available to generate chart";
     }
 
+    // Check majority type instead of just first row
+    const sampleSize = Math.min(data.length, 100);
     for (const col of columns) {
-        if (typeof data[0][col] !== 'number') {
+        let numCount = 0;
+        for (let i = 0; i < sampleSize; i++) {
+            if (typeof data[i][col] === 'number') numCount++;
+        }
+        if (numCount < sampleSize * 0.5) {
             return `Column "${col}" is not of number type, Please choose numeric columns only`
         }
     }
 
     const columnData = {};
     columns.forEach(col => {
-        columnData[col] = data.map(row => row[col]).filter(v => typeof v === 'number');
+        columnData[col] = data.map(row => row[col]).filter(v => typeof v === 'number' && !isNaN(v));
     });
 
     const matrix = [];

@@ -15,21 +15,29 @@ export async function pieChart(sheet, column, email, description) {
         return "No data available to generate chart";
     }
 
-    if (typeof data[0][column] !== 'string') {
+    // Check majority type instead of just first row
+    const sampleSize = Math.min(data.length, 100);
+    let stringCount = 0;
+    for (let i = 0; i < sampleSize; i++) {
+        if (typeof data[i][column] === 'string') stringCount++;
+    }
+    if (stringCount < sampleSize * 0.5) {
         return "This column is not of string type, Please choose another column"
     }
 
 
     const values = {};
 
-    data.map((row) => {
-        //check if value exist
-        if (row[column] in values) {
-            values[row[column]]++;
-        }else{
-            values[row[column]]=1;
+    data.forEach((row) => {
+        const val = row[column];
+        // Skip null/undefined/empty values
+        if (val == null || val === '') return;
+        const key = String(val);
+        if (key in values) {
+            values[key]++;
+        } else {
+            values[key] = 1;
         }
-
     });
 
     let chartMeta = {
