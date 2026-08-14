@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
 import ValuesPanel from "./values";
@@ -423,6 +423,7 @@ function filterFunctionCategories(query, aiKeys = []) {
 
 /* ─── Shared FileView component (used by both Excel and CSV) ─── */
 export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, onSheetChange }) {
+  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [history, setHistory] = useState([]);
   const [drafts, setDrafts] = useState([]);
@@ -685,6 +686,23 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
           <span className="nav-tab active">{navLabel}</span>
         </div>
         <div className="nav-actions">
+          <button
+            className="export-btn"
+            onClick={() =>
+              navigate("/charts", {
+                state: {
+                  sheet: data,
+                  filePath: file.filename || `file_${file.id}`,
+                  columns: data.length > 0 ? Object.keys(data[0]) : [],
+                  email: localStorage.getItem("dc_userEmail") || "",
+                },
+              })
+            }
+            title="Visualise data"
+            style={{ background: "#6B5D4F", color: "#fff", border: "none", borderRadius: 6, padding: "6px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", marginRight: 8 }}
+          >
+            Visualise
+          </button>
           <button className="export-btn" onClick={exportFile} title="Download as XLSX">
             Export
           </button>

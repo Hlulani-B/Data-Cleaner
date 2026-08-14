@@ -3,6 +3,7 @@ import Dashboard from "./Components/dashboard";
 import ExcelFile from "./Components/excel_file";
 import CsvFile from "./Components/csv_file";
 import Login from "./Components/login";
+import ChartsPage from "./graphs/pages/chartsPage";
 import "./App.css";
 
 function RequireAuth({ children }) {
@@ -19,6 +20,7 @@ function App() {
         <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
         <Route path="/excel/:fileId" element={<RequireAuth><ExcelFile /></RequireAuth>} />
         <Route path="/csv/:fileId" element={<RequireAuth><CsvFile /></RequireAuth>} />
+        <Route path="/charts" element={<RequireAuth><ChartsPage /></RequireAuth>} />
       </Routes>
     </BrowserRouter>
   );

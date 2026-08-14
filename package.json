@@ -20,6 +20,7 @@
     "firebase": "^12.17.1",
     "neon": "^3.1.1",
     "openai": "^7.4.0",
+    "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
