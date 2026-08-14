@@ -3,6 +3,18 @@ An interactive, browser-based data scrubbing and visualization workspace.
 
 
 A full-stack web application for cleaning and processing CSV/XLSX files. Sign in with Google, upload a spreadsheet, run an automatic initial clean, then apply individual cleaning functions — with undo, draft history, and Neon database persistence.
+
+## Screenshots
+
+| | |
+|:---:|:---:|
+| ![Login](images/Screenshot_14-8-2026_16128_data-cleaner-wine.vercel.app.jpeg) | ![Dashboard](images/Screenshot_14-8-2026_161641_data-cleaner-wine.vercel.app.jpeg) |
+| ![Data View](images/Screenshot_14-8-2026_161742_data-cleaner-wine.vercel.app.jpeg) | ![Cleaning Functions](images/Screenshot_14-8-2026_161925_data-cleaner-wine.vercel.app.jpeg) |
+| ![Charts](images/Screenshot_14-8-2026_162014_data-cleaner-wine.vercel.app.jpeg) | ![Visualization](images/Screenshot_14-8-2026_16546_data-cleaner-wine.vercel.app.jpeg) |
+
+### Chart Example
+![Price vs Total](images/price_vs_total.png)
+
 ## Why I Built This
 
 Data preparation is notoriously inefficient. When faced with an unrefined dataset, analysts and software engineers generally face three suboptimal choices:
