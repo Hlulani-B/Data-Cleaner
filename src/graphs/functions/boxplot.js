@@ -104,5 +104,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving box plot:', err.message);
     }
 
-    return { boxes, ...chartMeta };
+    return { boxes, rows: data.length, ...chartMeta };
 }

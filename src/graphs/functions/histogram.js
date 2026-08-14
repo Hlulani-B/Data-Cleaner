@@ -112,5 +112,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving histogram:', err.message);
     }
 
-    return { bins, ...chartMeta };
+    return { bins, rows: data.length, ...chartMeta };
 }

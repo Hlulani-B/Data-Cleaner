@@ -122,6 +122,15 @@ export default function ChartsPage() {
       </nav>
 
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
+        {/* Dataset Info */}
+        <section style={{ background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 10, padding: "12px 20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontSize: 13, color: theme.textMuted }}>Dataset:</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{sheet.length.toLocaleString()} rows</span>
+          <span style={{ fontSize: 13, color: theme.textMuted }}>&times;</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{columns.length} columns</span>
+          <span style={{ fontSize: 12, color: theme.textMuted, marginLeft: "auto" }}>{filePath}</span>
+        </section>
+
         {/* Chart Type Picker */}
         <section style={{ background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
           <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600 }}>Choose Chart Type</h2>

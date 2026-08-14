@@ -102,5 +102,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving heatmap:', err.message);
     }
 
-    return { matrix, ...chartMeta };
+    return { matrix, rows: data.length, ...chartMeta };
 }

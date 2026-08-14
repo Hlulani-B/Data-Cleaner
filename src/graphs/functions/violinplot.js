@@ -101,5 +101,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving violin plot:', err.message);
     }
 
-    return { violins, ...chartMeta };
+    return { violins, rows: data.length, ...chartMeta };
 }

@@ -95,5 +95,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving bar chart:', err.message);
     }
 
-    return { values, ...chartMeta };
+    return { values, rows: data.length, ...chartMeta };
 }

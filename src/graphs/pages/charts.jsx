@@ -143,6 +143,11 @@ export default function ChartViewer({ type, params, apiUrl = "/api/charts" }) {
               {result.description}
             </p>
           )}
+          {result?.rows != null && (
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: theme.accent }}>
+              {result.rows.toLocaleString()} rows processed
+            </p>
+          )}
         </div>
 
         <button

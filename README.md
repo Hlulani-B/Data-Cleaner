@@ -139,6 +139,28 @@ Interactive view to inspect and remove rows with empty/missing data:
 - Stats dashboard: total rows, rows with empty cells, fully empty rows, total empty cells
 - Batch actions: select all empty rows, select fully empty rows only, remove selected or all
 
+### Data Visualization
+AI-powered chart generation with 11 chart types. All charts are generated from the full dataset, saved to Neon Postgres, and enriched with AI-generated titles, axis labels, and insights.
+
+| Chart Type       | Input                                  | Description                                      |
+|------------------|----------------------------------------|--------------------------------------------------|
+| Bar Chart        | 1 string column                        | Frequency of each category                       |
+| Histogram        | 1 numeric column                       | Distribution across value bins                   |
+| Pie Chart        | 1 string column                        | Proportional breakdown of categories             |
+| Scatter Plot     | 2 numeric columns (X, Y)               | Relationship between two variables               |
+| Line Graph       | X + Y columns (Y numeric)              | Trend over an ordered axis                       |
+| Area Chart       | X + Y columns (Y numeric)              | Cumulative trend with filled area                |
+| Box Plot         | Category + Value columns               | Distribution quartiles and outliers per category |
+| Violin Plot      | Category + Value columns               | Density distribution per category                |
+| Heatmap          | 2+ numeric columns                     | Pearson correlation matrix between columns       |
+| Stacked Bar      | Category + Group columns (both string) | Group breakdown within each category             |
+| Bubble Chart     | 3 numeric columns (X, Y, Size)         | Three-variable comparison with sized bubbles     |
+
+- **AI Insights** — each chart gets an AI-generated title, axis labels, and a plain-English description of what stands out in the data
+- **Persistent** — all chart data is saved to Neon Postgres and can be retrieved later
+- **Download** — export any chart as a high-resolution PNG
+- **Row counts** — every chart shows how many rows were processed from the dataset
+
 ### Search
 - **Data Search Bar** — sits at the top of every sheet view; filters rows in real time by typing any keyword
   - Case-insensitive, searches across all columns simultaneously
@@ -159,9 +181,10 @@ Interactive view to inspect and remove rows with empty/missing data:
 |--------------|----------------------------------------------------|
 | Frontend     | React 19, React Router 7, Vite 8                  |
 | Auth         | Firebase Authentication (Google Sign-In)           |
-| Backend      | Vercel serverless (5 functions) + Express dev server |
+| Backend      | Vercel serverless (6 functions) + Express dev server |
 | Database     | Neon Postgres (`@neondatabase/serverless`)         |
 | Spreadsheets | xlsx (client-side parsing and export)              |
+| Charts       | Recharts (bar, line, area, pie, scatter, composed) |
 | AI           | OpenAI, Hugging Face, Google Gemini, Cerebras, Groq |
 | Testing      | Jest (with experimental VM modules)                |
 | Linting      | Oxlint                                             |
@@ -234,6 +257,7 @@ Vercel's free tier allows **12 serverless functions max**. Early in development,
 | Endpoint                | Handles                                           |
 |-------------------------|---------------------------------------------------|
 | `api/operations.js`     | All data transforms + 21 math operations (upper, lower, proper, clean, trim, duplicates, removeEmpty, removeColumn, missingValues, dateStandard, typeConversion, separate, join, concatenate, datatype, upload, math, absolute) |
+| `api/charts.js`         | All 11 chart types — dispatches to graph functions (bar, histogram, pie, scatter, line, area, box, violin, heatmap, stacked bar, bubble) |
 | `api/files.js`          | File CRUD in Neon Postgres (save, list, get, update, delete, versions) |
 | `api/auth.js`           | User registration in Neon Postgres                |
 | `api/ai.js`             | Multi-provider AI orchestration                   |
@@ -252,13 +276,14 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 ## Project Structure
 
 ```
-├── api/                          # Serverless API (4 functions)
+├── api/                          # Serverless API (6 functions)
 │   ├── functions/
 │   │   ├── automatic/            # Auto-applied operations (trim, clean, duplicates, datatype)
 │   │   └── user_choice/          # User-selected operations (case, dates, types, separate, join, math, etc.)
 │   ├── database/
 │   │   └── neon.js               # Neon Postgres database class with ensureTables()
 │   ├── operations.js             # Unified handler for all data + math transforms
+│   ├── charts.js                 # Unified handler for all 11 chart types
 │   ├── files.js                  # File CRUD (save/list/get/update/delete/versions)
 │   ├── auth.js                   # User registration endpoint
 │   ├── ai.js                     # Multi-provider AI orchestration
@@ -267,6 +292,10 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 │   └── index.js                  # Express dev server (API + Vite middleware)
 ├── src/
 │   ├── functions/                # Client-side operation classes (automatic + user_choice; incl. getValues, search)
+│   ├── graphs/
+│   │   ├── functions/            # 11 chart functions (bar, histogram, pie, scatter, line, area, box, violin, heatmap, stacked, bubble)
+│   │   ├── pages/                # ChartViewer component + ChartsPage UI
+│   │   └── artificial_intelligence/ # AI insight generation for charts
 │   ├── Components/
 │   │   ├── login.jsx             # Login page — Google sign-in + Neon registration
 │   │   ├── dashboard.jsx         # Dashboard — upload + file cards + Neon sync
@@ -286,7 +315,7 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 
 ## Database Schema
 
-Four tables — **Users**, **Files**, **File_Versions**, and **Graphs** — track users, uploaded files, version history (drafts/undo), and chart images. Tables auto-create on first request via `ensureTables()`. See [database_schema.md](database_schema.md) for full details.
+Fifteen tables — **Users**, **Files**, **File_Versions**, **Graphs**, plus one per chart type (**bargraph**, **histogram**, **piechart**, **scatterplot**, **linegraph**, **boxplot**, **heatmap**, **stackedbar**, **areachart**, **bubblechart**, **violinplot**) — track users, uploaded files, version history (drafts/undo), chart images, and persisted chart data. Tables auto-create on first request via `ensureTables()`. See [database_schema.md](database_schema.md) for full details.
 
 **Flow**
 

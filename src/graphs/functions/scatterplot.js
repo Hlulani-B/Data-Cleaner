@@ -90,5 +90,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving scatter plot:', err.message);
     }
 
-    return { points, ...chartMeta };
+    return { points, rows: data.length, ...chartMeta };
 }

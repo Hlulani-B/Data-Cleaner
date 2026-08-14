@@ -89,5 +89,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving stacked bar:', err.message);
     }
 
-    return { bars, ...chartMeta };
+    return { bars, rows: data.length, ...chartMeta };
 }
