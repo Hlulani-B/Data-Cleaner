@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
-    connectionString: process.env.NEON_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
@@ -40,6 +40,7 @@ export async function lineGraph(sheet, xColumn, yColumn, email, description) {
         description: description || `Line graph showing ${yColumn} trend across ${xColumn}`
     };
 
+    // AI enhancement (non-fatal)
     try {
         const prompt = `You are analyzing line graph data for a data visualization tool.
 
@@ -63,7 +64,12 @@ Return only the JSON object, nothing else.`;
             const clean = response.replace(/```json|```/g, "").trim();
             chartMeta = JSON.parse(clean);
         }
+    } catch (err) {
+        console.error('AI error for line graph (continuing):', err.message);
+    }
 
+    // Save to DB (always, even if AI failed)
+    try {
         await pool.query(
             `INSERT INTO linegraph (email, filepath, x_column, y_column, points, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -81,7 +87,7 @@ Return only the JSON object, nothing else.`;
             ]
         );
     } catch (err) {
-        console.error('AI/DB error for line graph (continuing with fallback):', err.message);
+        console.error('DB error saving line graph:', err.message);
     }
 
     return { points, ...chartMeta };

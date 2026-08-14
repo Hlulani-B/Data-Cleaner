@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
-    connectionString: process.env.NEON_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
@@ -64,6 +64,7 @@ export async function boxPlot(sheet, categoryColumn, valueColumn, email, descrip
         description: description || `Box plot showing distribution of ${valueColumn} across ${categoryColumn} groups`
     };
 
+    // AI enhancement (non-fatal)
     try {
         const prompt = `You are analyzing box plot data for a data visualization tool.
 
@@ -87,7 +88,12 @@ Return only the JSON object, nothing else.`;
             const clean = response.replace(/```json|```/g, "").trim();
             chartMeta = JSON.parse(clean);
         }
+    } catch (err) {
+        console.error('AI error for box plot (continuing):', err.message);
+    }
 
+    // Save to DB (always, even if AI failed)
+    try {
         await pool.query(
             `INSERT INTO boxplot (email, filepath, category_column, value_column, boxes, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -95,7 +101,7 @@ Return only the JSON object, nothing else.`;
             [email, JSON.stringify(sheet), categoryColumn, valueColumn, JSON.stringify(boxes), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
-        console.error('AI/DB error for box plot (continuing with fallback):', err.message);
+        console.error('DB error saving box plot:', err.message);
     }
 
     return { boxes, ...chartMeta };

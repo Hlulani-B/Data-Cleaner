@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
-    connectionString: process.env.NEON_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
@@ -63,6 +63,7 @@ export async function heatmap(sheet, columns, email, description) {
         description: description || "Heatmap showing Pearson correlations between numeric columns"
     };
 
+    // AI enhancement (non-fatal)
     try {
         const prompt = `You are analyzing a correlation heatmap for a data visualization tool.
 
@@ -85,7 +86,12 @@ Return only the JSON object, nothing else.`;
             const clean = response.replace(/```json|```/g, "").trim();
             chartMeta = JSON.parse(clean);
         }
+    } catch (err) {
+        console.error('AI error for heatmap (continuing):', err.message);
+    }
 
+    // Save to DB (always, even if AI failed)
+    try {
         await pool.query(
             `INSERT INTO heatmap (email, filepath, columns, matrix, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -93,7 +99,7 @@ Return only the JSON object, nothing else.`;
             [email, JSON.stringify(sheet), JSON.stringify(columns), JSON.stringify(matrix), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
-        console.error('AI/DB error for heatmap (continuing with fallback):', err.message);
+        console.error('DB error saving heatmap:', err.message);
     }
 
     return { matrix, ...chartMeta };

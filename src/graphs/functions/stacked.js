@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
-    connectionString: process.env.NEON_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
@@ -49,6 +49,7 @@ export async function stackedBar(sheet, categoryColumn, groupColumn, email, desc
         description: description || `Stacked bar chart showing ${groupColumn} breakdown within each ${categoryColumn}`
     };
 
+    // AI enhancement (non-fatal)
     try {
         const prompt = `You are analyzing stacked bar chart data for a data visualization tool.
 
@@ -56,7 +57,7 @@ Category column: "${categoryColumn}"
 Group column: "${groupColumn}"
 Data (JSON array, one object per category with group counts as keys): ${JSON.stringify(bars)}
 
-Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
+Respond with ONLY a valid JSON object (no code, no backticks, no preamble):
 
 {
   "title": "A short, descriptive chart title (max 8 words)",
@@ -72,7 +73,12 @@ Return only the JSON object, nothing else.`;
             const clean = response.replace(/```json|```/g, "").trim();
             chartMeta = JSON.parse(clean);
         }
+    } catch (err) {
+        console.error('AI error for stacked bar (continuing):', err.message);
+    }
 
+    // Save to DB (always, even if AI failed)
+    try {
         await pool.query(
             `INSERT INTO stackedbar (email, filepath, category_column, group_column, bars, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -80,7 +86,7 @@ Return only the JSON object, nothing else.`;
             [email, JSON.stringify(sheet), categoryColumn, groupColumn, JSON.stringify(bars), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
-        console.error('AI/DB error for stacked bar (continuing with fallback):', err.message);
+        console.error('DB error saving stacked bar:', err.message);
     }
 
     return { bars, ...chartMeta };

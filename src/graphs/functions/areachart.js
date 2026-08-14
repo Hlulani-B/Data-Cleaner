@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
-    connectionString: process.env.NEON_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
@@ -37,6 +37,7 @@ export async function areaChart(sheet, xColumn, yColumn, email, description) {
         description: description || `Area chart showing ${yColumn} across ${xColumn}`
     };
 
+    // AI enhancement (non-fatal)
     try {
         const prompt = `You are analyzing area chart data for a data visualization tool.
 
@@ -60,7 +61,12 @@ Return only the JSON object, nothing else.`;
             const clean = response.replace(/```json|```/g, "").trim();
             chartMeta = JSON.parse(clean);
         }
+    } catch (err) {
+        console.error('AI error for area chart (continuing):', err.message);
+    }
 
+    // Save to DB (always, even if AI failed)
+    try {
         await pool.query(
             `INSERT INTO areachart (email, filepath, x_column, y_column, points, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -68,7 +74,7 @@ Return only the JSON object, nothing else.`;
             [email, JSON.stringify(sheet), xColumn, yColumn, JSON.stringify(points), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
-        console.error('AI/DB error for area chart (continuing with fallback):', err.message);
+        console.error('DB error saving area chart:', err.message);
     }
 
     return { points, ...chartMeta };

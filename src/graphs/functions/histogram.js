@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
-    connectionString: process.env.NEON_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
@@ -64,6 +64,7 @@ export async function histogram(sheet, column, email, description, binCount = 10
         description: description || `Histogram showing distribution of ${column} values`
     };
 
+    // AI enhancement (non-fatal)
     try {
         const prompt = `You are analyzing histogram data for a data visualization tool.
 
@@ -86,7 +87,12 @@ Return only the JSON object, nothing else.`;
             const clean = response.replace(/```json|```/g, "").trim();
             chartMeta = JSON.parse(clean);
         }
+    } catch (err) {
+        console.error('AI error for histogram (continuing):', err.message);
+    }
 
+    // Save to DB (always, even if AI failed)
+    try {
         await pool.query(
             `INSERT INTO histogram (email, filepath, "column", bins, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -103,7 +109,7 @@ Return only the JSON object, nothing else.`;
             ]
         );
     } catch (err) {
-        console.error('AI/DB error for histogram (continuing with fallback):', err.message);
+        console.error('DB error saving histogram:', err.message);
     }
 
     return { bins, ...chartMeta };

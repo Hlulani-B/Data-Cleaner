@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
-    connectionString: process.env.NEON_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
@@ -47,6 +47,7 @@ export async function barChart(sheet, column, email, description="") {
         description: description || `Bar chart showing frequency of each ${column} value`
     };
 
+    // AI enhancement (non-fatal)
     try {
         const prompt = `You are analyzing bar chart data for a data visualization tool.
 
@@ -69,7 +70,12 @@ Return only the JSON object, nothing else.`;
             const clean = response.replace(/```json|```/g, "").trim();
             chartMeta = JSON.parse(clean);
         }
+    } catch (err) {
+        console.error('AI error for bar chart (continuing):', err.message);
+    }
 
+    // Save to DB (always, even if AI failed)
+    try {
         await pool.query(
             `INSERT INTO bargraph (email, filepath, "column", values, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -86,7 +92,7 @@ Return only the JSON object, nothing else.`;
             ]
         );
     } catch (err) {
-        console.error('AI/DB error for bar chart (continuing with fallback):', err.message);
+        console.error('DB error saving bar chart:', err.message);
     }
 
     return { values, ...chartMeta };
