@@ -1,10 +1,21 @@
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL);
 import OpenAI from "openai";
 import { InferenceClient } from "@huggingface/inference";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Cerebras from "@cerebras/cerebras_cloud_sdk";
+
+// Lazy-load neon to prevent import-time crashes
+let sql = null;
+async function getSql() {
+  if (sql) return sql;
+  try {
+    const { neon } = await import("@neondatabase/serverless");
+    sql = neon(process.env.DATABASE_URL);
+    return sql;
+  } catch (err) {
+    console.warn("Neon SQL not available:", err.message);
+    return null;
+  }
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -172,6 +183,8 @@ const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
 async function isOnCooldown(providerName) {
   try {
+    const sql = await getSql();
+    if (!sql) return false;
     const rows = await sql`
       SELECT cooldown_until FROM ai_provider_cooldowns
       WHERE provider = ${providerName}
@@ -187,6 +200,8 @@ async function isOnCooldown(providerName) {
 
 async function setCooldown(providerName) {
   try {
+    const sql = await getSql();
+    if (!sql) return;
     const cooldownUntil = new Date(Date.now() + COOLDOWN_MS).toISOString();
     await sql`
       INSERT INTO ai_provider_cooldowns (provider, cooldown_until)
