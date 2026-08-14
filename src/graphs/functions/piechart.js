@@ -9,9 +9,11 @@ const pool = new Pool({
 
 export async function pieChart(sheet, column, email, description) {
 
-    //check for the data type of the column
-
     const data = XLSX.utils.sheet_to_json(sheet);
+
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
 
     if (typeof data[0][column] !== 'string') {
         return "This column is not of string type, Please choose another column"
@@ -30,8 +32,14 @@ export async function pieChart(sheet, column, email, description) {
 
     });
 
-    try {
+    let chartMeta = {
+        title: `${column} Breakdown`,
+        x_axis: column,
+        y_axis: "Count",
+        description: description || `Pie chart showing proportion of each ${column} value`
+    };
 
+    try {
         const prompt = `You are analyzing pie chart data for a data visualization tool.
 
 Column charted: "${column}"
@@ -49,11 +57,12 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean); // { title, x_axis, y_axis, description }
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO piechart (email, filepath, "column", values, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id`,
@@ -68,10 +77,9 @@ Return only the JSON object, nothing else.`;
                 chartMeta.y_axis
             ]
         );
-
-        return { values, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving pie chart to Neon:', err);
-        return { values, error: 'Failed to save pie chart results' };
+        console.error('AI/DB error for pie chart (continuing with fallback):', err.message);
     }
+
+    return { values, ...chartMeta };
 }

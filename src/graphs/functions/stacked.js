@@ -11,6 +11,10 @@ export async function stackedBar(sheet, categoryColumn, groupColumn, email, desc
 
     const data = XLSX.utils.sheet_to_json(sheet);
 
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
+
     if (typeof data[0][categoryColumn] !== 'string' || typeof data[0][groupColumn] !== 'string') {
         return "Both columns must be of string type, Please choose another column"
     }
@@ -31,6 +35,13 @@ export async function stackedBar(sheet, categoryColumn, groupColumn, email, desc
         ...groups
     }));
 
+    let chartMeta = {
+        title: `${categoryColumn} by ${groupColumn}`,
+        x_axis: categoryColumn,
+        y_axis: "Count",
+        description: description || `Stacked bar chart showing ${groupColumn} breakdown within each ${categoryColumn}`
+    };
+
     try {
         const prompt = `You are analyzing stacked bar chart data for a data visualization tool.
 
@@ -50,20 +61,20 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean);
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO stackedbar (email, filepath, category_column, group_column, bars, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
             [email, JSON.stringify(sheet), categoryColumn, groupColumn, JSON.stringify(bars), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
-
-        return { bars, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving stacked bar to Neon:', err);
-        return { bars, error: 'Failed to save stacked bar results' };
+        console.error('AI/DB error for stacked bar (continuing with fallback):', err.message);
     }
+
+    return { bars, ...chartMeta };
 }

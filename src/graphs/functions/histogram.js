@@ -18,15 +18,21 @@ const pool = new Pool({
  */
 export async function histogram(sheet, column, email, description, binCount = 10) {
 
-    //check for the data type of the column
-
     const data = XLSX.utils.sheet_to_json(sheet);
+
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
 
     if (typeof data[0][column] !== 'number') {
         return "This column is not of number type, Please choose another column"
     }
 
     const numbers = data.map(row => row[column]).filter(val => typeof val === 'number');
+
+    if (numbers.length === 0) {
+        return "No numeric values found in this column";
+    }
 
     const min = Math.min(...numbers);
     const max = Math.max(...numbers);
@@ -45,8 +51,14 @@ export async function histogram(sheet, column, email, description, binCount = 10
         bins[binIndex].count++;
     });
 
-    try {
+    let chartMeta = {
+        title: `${column} Distribution`,
+        x_axis: column,
+        y_axis: "Frequency",
+        description: description || `Histogram showing distribution of ${column} values`
+    };
 
+    try {
         const prompt = `You are analyzing histogram data for a data visualization tool.
 
 Column charted: "${column}"
@@ -64,11 +76,12 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean); // { title, x_axis, y_axis, description }
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO histogram (email, filepath, "column", bins, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id`,
@@ -83,10 +96,9 @@ Return only the JSON object, nothing else.`;
                 chartMeta.y_axis
             ]
         );
-
-        return { bins, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving histogram to Neon:', err);
-        return { bins, error: 'Failed to save histogram results' };
+        console.error('AI/DB error for histogram (continuing with fallback):', err.message);
     }
+
+    return { bins, ...chartMeta };
 }

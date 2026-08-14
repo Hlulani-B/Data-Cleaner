@@ -11,6 +11,10 @@ export async function bubbleChart(sheet, xColumn, yColumn, sizeColumn, email, de
 
     const data = XLSX.utils.sheet_to_json(sheet);
 
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
+
     if (typeof data[0][xColumn] !== 'number' || typeof data[0][yColumn] !== 'number' || typeof data[0][sizeColumn] !== 'number') {
         return "All three columns must be of number type, Please choose another column"
     }
@@ -18,6 +22,13 @@ export async function bubbleChart(sheet, xColumn, yColumn, sizeColumn, email, de
     const points = data
         .filter(row => typeof row[xColumn] === 'number' && typeof row[yColumn] === 'number' && typeof row[sizeColumn] === 'number')
         .map(row => ({ x: row[xColumn], y: row[yColumn], z: row[sizeColumn] }));
+
+    let chartMeta = {
+        title: `${xColumn} vs ${yColumn} (size: ${sizeColumn})`,
+        x_axis: xColumn,
+        y_axis: yColumn,
+        description: description || `Bubble chart comparing ${xColumn}, ${yColumn}, and ${sizeColumn}`
+    };
 
     try {
         const prompt = `You are analyzing bubble chart data for a data visualization tool.
@@ -39,20 +50,20 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean);
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO bubblechart (email, filepath, x_column, y_column, size_column, points, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              RETURNING id`,
             [email, JSON.stringify(sheet), xColumn, yColumn, sizeColumn, JSON.stringify(points), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
-
-        return { points, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving bubble chart to Neon:', err);
-        return { points, error: 'Failed to save bubble chart results' };
+        console.error('AI/DB error for bubble chart (continuing with fallback):', err.message);
     }
+
+    return { points, ...chartMeta };
 }

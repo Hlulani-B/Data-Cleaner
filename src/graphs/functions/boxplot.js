@@ -21,6 +21,10 @@ export async function boxPlot(sheet, categoryColumn, valueColumn, email, descrip
 
     const data = XLSX.utils.sheet_to_json(sheet);
 
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
+
     if (typeof data[0][valueColumn] !== 'number') {
         return "Value column must be of number type, Please choose another column"
     }
@@ -47,6 +51,13 @@ export async function boxPlot(sheet, categoryColumn, valueColumn, email, descrip
         return { category, min, q1, median, q3, max, outliers };
     });
 
+    let chartMeta = {
+        title: `${valueColumn} by ${categoryColumn}`,
+        x_axis: categoryColumn,
+        y_axis: valueColumn,
+        description: description || `Box plot showing distribution of ${valueColumn} across ${categoryColumn} groups`
+    };
+
     try {
         const prompt = `You are analyzing box plot data for a data visualization tool.
 
@@ -66,20 +77,20 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean);
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO boxplot (email, filepath, category_column, value_column, boxes, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
             [email, JSON.stringify(sheet), categoryColumn, valueColumn, JSON.stringify(boxes), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
-
-        return { boxes, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving box plot to Neon:', err);
-        return { boxes, error: 'Failed to save box plot results' };
+        console.error('AI/DB error for box plot (continuing with fallback):', err.message);
     }
+
+    return { boxes, ...chartMeta };
 }

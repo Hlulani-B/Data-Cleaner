@@ -11,6 +11,10 @@ export async function violinPlot(sheet, categoryColumn, valueColumn, email, desc
 
     const data = XLSX.utils.sheet_to_json(sheet);
 
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
+
     if (typeof data[0][valueColumn] !== 'number') {
         return "Value column must be of number type, Please choose another column"
     }
@@ -44,6 +48,13 @@ export async function violinPlot(sheet, categoryColumn, valueColumn, email, desc
         return { category, min, max, density };
     });
 
+    let chartMeta = {
+        title: `${valueColumn} Distribution by ${categoryColumn}`,
+        x_axis: categoryColumn,
+        y_axis: valueColumn,
+        description: description || `Violin plot showing density of ${valueColumn} across ${categoryColumn} groups`
+    };
+
     try {
         const prompt = `You are analyzing violin plot data for a data visualization tool.
 
@@ -63,20 +74,20 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean);
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO violinplot (email, filepath, category_column, value_column, violins, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
             [email, JSON.stringify(sheet), categoryColumn, valueColumn, JSON.stringify(violins), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
-
-        return { violins, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving violin plot to Neon:', err);
-        return { violins, error: 'Failed to save violin plot results' };
+        console.error('AI/DB error for violin plot (continuing with fallback):', err.message);
     }
+
+    return { violins, ...chartMeta };
 }

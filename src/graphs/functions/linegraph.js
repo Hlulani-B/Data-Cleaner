@@ -9,9 +9,11 @@ const pool = new Pool({
 
 export async function lineGraph(sheet, xColumn, yColumn, email, description) {
 
-    //check for the data type of the y column (numeric value being tracked)
-
     const data = XLSX.utils.sheet_to_json(sheet);
+
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
 
     if (typeof data[0][yColumn] !== 'number') {
         return "Y column must be of number type, Please choose another column"
@@ -25,8 +27,14 @@ export async function lineGraph(sheet, xColumn, yColumn, email, description) {
         }))
         .sort((a, b) => (a.x > b.x ? 1 : a.x < b.x ? -1 : 0));
 
-    try {
+    let chartMeta = {
+        title: `${yColumn} over ${xColumn}`,
+        x_axis: xColumn,
+        y_axis: yColumn,
+        description: description || `Line graph showing ${yColumn} trend across ${xColumn}`
+    };
 
+    try {
         const prompt = `You are analyzing line graph data for a data visualization tool.
 
 X column: "${xColumn}"
@@ -45,11 +53,12 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean); // { title, x_axis, y_axis, description }
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO linegraph (email, filepath, x_column, y_column, points, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
@@ -65,10 +74,9 @@ Return only the JSON object, nothing else.`;
                 chartMeta.y_axis
             ]
         );
-
-        return { points, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving line graph to Neon:', err);
-        return { points, error: 'Failed to save line graph results' };
+        console.error('AI/DB error for line graph (continuing with fallback):', err.message);
     }
+
+    return { points, ...chartMeta };
 }

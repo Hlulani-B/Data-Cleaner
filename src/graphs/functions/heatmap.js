@@ -24,6 +24,10 @@ export async function heatmap(sheet, columns, email, description) {
 
     const data = XLSX.utils.sheet_to_json(sheet);
 
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
+
     for (const col of columns) {
         if (typeof data[0][col] !== 'number') {
             return `Column "${col}" is not of number type, Please choose numeric columns only`
@@ -46,6 +50,13 @@ export async function heatmap(sheet, columns, email, description) {
         });
     });
 
+    let chartMeta = {
+        title: "Correlation Heatmap",
+        x_axis: "Columns",
+        y_axis: "Columns",
+        description: description || "Heatmap showing Pearson correlations between numeric columns"
+    };
+
     try {
         const prompt = `You are analyzing a correlation heatmap for a data visualization tool.
 
@@ -64,20 +75,20 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean);
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO heatmap (email, filepath, columns, matrix, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id`,
             [email, JSON.stringify(sheet), JSON.stringify(columns), JSON.stringify(matrix), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
-
-        return { matrix, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving heatmap to Neon:', err);
-        return { matrix, error: 'Failed to save heatmap results' };
+        console.error('AI/DB error for heatmap (continuing with fallback):', err.message);
     }
+
+    return { matrix, ...chartMeta };
 }

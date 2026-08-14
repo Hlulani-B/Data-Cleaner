@@ -9,9 +9,11 @@ const pool = new Pool({
 
 export async function scatterPlot(sheet, xColumn, yColumn, email, description) {
 
-    //check for the data type of both columns
-
     const data = XLSX.utils.sheet_to_json(sheet);
+
+    if (!data || data.length === 0) {
+        return "No data available to generate chart";
+    }
 
     if (typeof data[0][xColumn] !== 'number' || typeof data[0][yColumn] !== 'number') {
         return "Both columns must be of number type, Please choose another column"
@@ -24,8 +26,14 @@ export async function scatterPlot(sheet, xColumn, yColumn, email, description) {
             y: row[yColumn]
         }));
 
-    try {
+    let chartMeta = {
+        title: `${xColumn} vs ${yColumn}`,
+        x_axis: xColumn,
+        y_axis: yColumn,
+        description: description || `Scatter plot showing relationship between ${xColumn} and ${yColumn}`
+    };
 
+    try {
         const prompt = `You are analyzing scatter plot data for a data visualization tool.
 
 X column: "${xColumn}"
@@ -44,11 +52,12 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
 Return only the JSON object, nothing else.`;
 
         const response = await AI(prompt);
-        const rawText = response.content.map(c => c.text || "").join("");
-        const clean = rawText.replace(/```json|```/g, "").trim();
-        const chartMeta = JSON.parse(clean); // { title, x_axis, y_axis, description }
+        if (response) {
+            const clean = response.replace(/```json|```/g, "").trim();
+            chartMeta = JSON.parse(clean);
+        }
 
-        const result = await pool.query(
+        await pool.query(
             `INSERT INTO scatterplot (email, filepath, x_column, y_column, points, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
@@ -64,10 +73,9 @@ Return only the JSON object, nothing else.`;
                 chartMeta.y_axis
             ]
         );
-
-        return { points, id: result.rows[0].id, ...chartMeta };
     } catch (err) {
-        console.error('Error saving scatter plot to Neon:', err);
-        return { points, error: 'Failed to save scatter plot results' };
+        console.error('AI/DB error for scatter plot (continuing with fallback):', err.message);
     }
+
+    return { points, ...chartMeta };
 }
