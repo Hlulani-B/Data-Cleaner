@@ -5,17 +5,17 @@
  * POST /api/charts
  * Body: { chart: "bar"|"histogram"|..., sheet: [...], email, description, ...extraParams }
  */
-import { barChart } from "../src/graphs/functions/bar_chart";
-import { histogram } from "../src/graphs/functions/histogram";
-import { pieChart } from "../src/graphs/functions/piechart";
-import { scatterPlot } from "../src/graphs/functions/scatterplot";
-import { lineGraph } from "../src/graphs/functions/linegraph";
-import { boxPlot } from "../src/graphs/functions/boxplot";
-import { heatmap } from "../src/graphs/functions/heatmap";
-import { stackedBar } from "../src/graphs/functions/stacked";
-import { areaChart } from "../src/graphs/functions/areachart";
-import { bubbleChart } from "../src/graphs/functions/bubblechart";
-import { violinPlot } from "../src/graphs/functions/violinplot";
+import { barChart } from "../src/graphs/functions/bar_chart.js";
+import { histogram } from "../src/graphs/functions/histogram.js";
+import { pieChart } from "../src/graphs/functions/piechart.js";
+import { scatterPlot } from "../src/graphs/functions/scatterplot.js";
+import { lineGraph } from "../src/graphs/functions/linegraph.js";
+import { boxPlot } from "../src/graphs/functions/boxplot.js";
+import { heatmap } from "../src/graphs/functions/heatmap.js";
+import { stackedBar } from "../src/graphs/functions/stacked.js";
+import { areaChart } from "../src/graphs/functions/areachart.js";
+import { bubbleChart } from "../src/graphs/functions/bubblechart.js";
+import { violinPlot } from "../src/graphs/functions/violinplot.js";
 import XLSX from "xlsx";
 
 function toSheet(data) {

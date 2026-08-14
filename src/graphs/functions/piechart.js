@@ -1,6 +1,6 @@
 import XLSX from 'xlsx';
 import { Pool } from 'pg';
-import { AI } from '../../../api/ai';
+import { AI } from '../../../api/ai.js';
 
 const pool = new Pool({
     connectionString: process.env.NEON_DATABASE_URL,
