@@ -76,7 +76,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight (e.g. strongest correlated pair, any negative correlations)"
+  "description": "A detailed, comprehensive analysis of this correlation heatmap. Discuss the strongest positive and negative correlations, which variable pairs are nearly uncorrelated, any clusters of highly correlated variables, the overall correlation structure, potential multicollinearity concerns, and what these relationships suggest about the underlying data. Include specific correlation values where notable. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

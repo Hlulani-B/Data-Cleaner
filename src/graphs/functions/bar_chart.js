@@ -60,7 +60,7 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis (usually 'Count' or 'Frequency')",
-  "description": "A 1-2 sentence plain-English insight about what stands out in this data (e.g. most common category, imbalance, notable gaps)"
+  "description": "A detailed, comprehensive analysis of this bar chart data. Discuss the most and least frequent categories, the overall distribution shape, any notable gaps or imbalances between categories, the relative proportions, and any patterns or anomalies that stand out. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

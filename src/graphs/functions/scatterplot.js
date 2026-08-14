@@ -53,7 +53,7 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight about the relationship (e.g. positive/negative correlation, no clear pattern, clusters, outliers)"
+  "description": "A detailed, comprehensive analysis of this scatter plot. Discuss the type and strength of correlation (positive, negative, or none), whether the relationship is linear or nonlinear, any clusters or groupings visible, outliers that deviate from the pattern, the density and spread of points, gaps in the data, and what this relationship suggests about the two variables. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

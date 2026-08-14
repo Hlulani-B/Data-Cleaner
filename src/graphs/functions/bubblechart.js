@@ -51,7 +51,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight (e.g. largest bubbles, any clustering, relationship between x, y, and size)"
+  "description": "A detailed, comprehensive analysis of this bubble chart. Discuss the relationship between all three variables (X, Y, and size), any clusters or groupings of bubbles, the largest and smallest bubbles and their positions, outliers, whether larger values of one variable tend to coincide with larger or smaller values of another, density patterns, gaps, and what the three-way comparison reveals. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

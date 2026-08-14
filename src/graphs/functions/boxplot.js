@@ -78,7 +78,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight (e.g. which category has the widest spread, most outliers)"
+  "description": "A detailed, comprehensive analysis of this box plot. Discuss the median values across categories, the spread (IQR) of each category, which categories have the widest and narrowest distributions, the presence and location of outliers, whether distributions are symmetric or skewed, how the quartiles compare between categories, and any notable differences in central tendency or variability. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

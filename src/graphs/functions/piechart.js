@@ -60,7 +60,7 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label describing the categories (e.g. the column name)",
   "y_axis": "Label describing what the slice size represents (usually 'Count' or 'Proportion')",
-  "description": "A 1-2 sentence plain-English insight about the split (e.g. dominant category, near-even split, one category is negligible)"
+  "description": "A detailed, comprehensive analysis of this pie chart's proportions. Discuss the dominant and smallest slices, whether the distribution is even or heavily skewed, the relative sizes of the major categories versus minor ones, any surprising or negligible segments, and what this breakdown reveals about the data composition. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

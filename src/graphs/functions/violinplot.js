@@ -75,7 +75,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight (e.g. which category is more spread out or concentrated)"
+  "description": "A detailed, comprehensive analysis of this violin plot. Discuss the density shape of each category (where values concentrate and thin out), which categories are more spread out versus concentrated, differences in central peaks, any multimodal distributions suggesting subgroups, the range and tails of each category, how the distributions compare across categories, and what the density patterns reveal about the data. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

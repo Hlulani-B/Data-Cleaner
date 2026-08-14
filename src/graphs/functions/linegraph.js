@@ -54,7 +54,7 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight about the trend (e.g. rising, falling, flat, sudden spikes/drops)"
+  "description": "A detailed, comprehensive analysis of this line graph's trend. Discuss the overall direction (rising, falling, flat, cyclical), the rate of change, any sudden spikes or drops and their significance, periods of stability versus volatility, the starting and ending values, key inflection points, seasonal or repeating patterns, and what the trend reveals about the data over time. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

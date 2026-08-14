@@ -51,7 +51,7 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight about the trend or cumulative volume"
+  "description": "A detailed, comprehensive analysis of this area chart. Discuss the overall trend direction and momentum, periods of growth versus decline, the rate of accumulation, any plateaus or sudden changes, the total volume represented by the filled area, key turning points, and what the cumulative pattern reveals about the data trajectory. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

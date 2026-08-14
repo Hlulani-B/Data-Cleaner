@@ -63,7 +63,7 @@ Respond with ONLY a valid JSON object (no code, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A 1-2 sentence plain-English insight (e.g. which category/group dominates, notable imbalance)"
+  "description": "A detailed, comprehensive analysis of this stacked bar chart. Discuss which category-group combinations dominate, the relative proportions within each category, whether the group distribution is consistent across categories or varies significantly, any categories that are heavily skewed toward one group, notable imbalances, and what the breakdown reveals about the relationship between the category and group variables. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;

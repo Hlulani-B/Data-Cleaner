@@ -77,7 +77,7 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis (usually 'Count' or 'Frequency')",
-  "description": "A 1-2 sentence plain-English insight about the distribution shape (e.g. skew, concentration, outliers)"
+  "description": "A detailed, comprehensive analysis of this histogram's distribution. Discuss the shape (normal, skewed left/right, bimodal, uniform), where values concentrate, the spread and range, any gaps between bins, potential outliers in the tails, the central tendency, and what this distribution reveals about the underlying data. Be thorough and insightful."
 }
 
 Return only the JSON object, nothing else.`;
