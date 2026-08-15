@@ -444,7 +444,9 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [getValuesResult, setGetValuesResult] = useState(null); // { column, values[] }
   const [saveStatus, setSaveStatus] = useState(""); // "" | "saving" | "saved" | "error"
   const sheetsRef = useRef(file?.sheets || {}); // always-current sheets for persist
-  const hasUnsavedRef = useRef(false); // track if a save is in-flight
+  const saveInFlightRef = useRef(false); // is a save request currently in-flight?
+  const pendingSaveRef = useRef(null); // latest data waiting to be saved after current save finishes
+  const saveTimerRef = useRef(null); // debounce timer
 
   // Keep sheetsRef in sync with the active sheet's latest data
   useEffect(() => {
@@ -454,7 +456,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   // Warn user if they try to refresh/close while saving
   useEffect(() => {
     const onBeforeUnload = (e) => {
-      if (hasUnsavedRef.current) {
+      if (saveInFlightRef.current || pendingSaveRef.current) {
         e.preventDefault();
         e.returnValue = "Your changes are still saving. Leave anyway?";
       }
@@ -497,41 +499,62 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   // Reset search when sheet changes
   useEffect(() => { setSearchQuery(""); }, [activeSheet]);
 
-  // Save current file state to Neon — uses sheetsRef for always-current data
+  // Serialized save: only one fetch in-flight at a time, latest data always wins
+  const doSave = useCallback((allSheets) => {
+    saveInFlightRef.current = true;
+    setSaveStatus("saving");
+    const body = JSON.stringify({
+      action: "update",
+      fileId: Number(file.id),
+      sheets: allSheets,
+      sheetNames: file.sheetNames || [],
+    });
+    fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("save failed");
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus(""), 2000);
+      })
+      .catch(() => {
+        // Retry with sendBeacon (survives page unload)
+        try {
+          navigator.sendBeacon("/api/files", new Blob([body], { type: "application/json" }));
+        } catch {}
+        setSaveStatus("error");
+        setTimeout(() => setSaveStatus(""), 3000);
+      })
+      .finally(() => {
+        saveInFlightRef.current = false;
+        // If a newer change came in while this save was in-flight, flush it now
+        if (pendingSaveRef.current) {
+          const next = pendingSaveRef.current;
+          pendingSaveRef.current = null;
+          doSave(next);
+        }
+      });
+  }, [file]);
+
+  // Debounced persist: waits 300ms, then sends the LATEST data through the serialized queue
   const persistFile = useCallback(
     (newSheetData) => {
       const allSheets = { ...sheetsRef.current, [activeSheet]: newSheetData };
-      sheetsRef.current = allSheets; // update ref immediately
-      hasUnsavedRef.current = true;
-      setSaveStatus("saving");
-      const body = JSON.stringify({
-        action: "update",
-        fileId: Number(file.id),
-        sheets: allSheets,
-        sheetNames: file.sheetNames || [],
-      });
-      fetch("/api/files", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      })
-        .then((r) => {
-          if (!r.ok) throw new Error("save failed");
-          hasUnsavedRef.current = false;
-          setSaveStatus("saved");
-          setTimeout(() => setSaveStatus(""), 2000);
-        })
-        .catch(() => {
-          // Retry with sendBeacon (survives page unload)
-          try {
-            navigator.sendBeacon("/api/files", new Blob([body], { type: "application/json" }));
-          } catch {}
-          hasUnsavedRef.current = false;
-          setSaveStatus("error");
-          setTimeout(() => setSaveStatus(""), 3000);
-        });
+      sheetsRef.current = allSheets;
+
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        if (saveInFlightRef.current) {
+          // A save is already in-flight — just remember the latest data
+          pendingSaveRef.current = allSheets;
+        } else {
+          doSave(allSheets);
+        }
+      }, 300);
     },
-    [file, activeSheet]
+    [activeSheet, doSave]
   );
 
   // Push current data to undo history
