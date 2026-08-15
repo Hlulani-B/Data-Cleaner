@@ -6,6 +6,7 @@
     { "source": "/api/interpret", "destination": "/api/interpret" },
     { "source": "/api/operations", "destination": "/api/operations" },
     { "source": "/api/charts", "destination": "/api/charts" },
+    { "source": "/api/fetchcharts", "destination": "/api/fetchcharts" },
     { "source": "/api/clean", "destination": "/api/operations" },
     { "source": "/api/upper", "destination": "/api/operations" },
     { "source": "/api/lower", "destination": "/api/operations" },

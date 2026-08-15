@@ -33,6 +33,14 @@ async function start() {
     console.warn("Charts module skipped —", err.message || err);
   }
 
+  let fetchcharts = null;
+  try {
+    const fetchchartsMod = await import("../api/fetchcharts.js");
+    fetchcharts = fetchchartsMod.default;
+  } catch (err) {
+    console.warn("FetchCharts module skipped —", err.message || err);
+  }
+
   // ai.js depends on optional packages — load gracefully
   let ai = null;
   try {
@@ -56,6 +64,9 @@ async function start() {
   app.all("/api/files", (req, res) => files(req, res));
   if (charts) {
     app.all("/api/charts", (req, res) => charts(req, res));
+  }
+  if (fetchcharts) {
+    app.all("/api/fetchcharts", (req, res) => fetchcharts(req, res));
   }
   if (ai) {
     app.all("/api/ai", (req, res) => ai(req, res));
@@ -90,7 +101,7 @@ async function start() {
 
   const port = 3000;
   app.listen(port, () => {
-    console.log(`\n  Data Cleaner dev server running at http://localhost:${port}\n`);
+    console.log(`\n  Data Cleaner & Visualiser dev server running at http://localhost:${port}\n`);
   });
 }
 

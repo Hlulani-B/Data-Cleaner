@@ -188,7 +188,7 @@ function Dashboard() {
     <div className="app-layout">
       <nav className="top-nav">
         <div className="nav-tabs">
-          <Link to="/" className="nav-tab active">Data Cleaner</Link>
+          <Link to="/" className="nav-tab active">Data Cleaner & Visualiser</Link>
           <span className="nav-tab">Excel</span>
           <span className="nav-tab">CSV</span>
         </div>

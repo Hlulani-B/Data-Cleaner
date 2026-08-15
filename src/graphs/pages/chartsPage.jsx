@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import ChartViewer from "./charts";
 
@@ -38,6 +38,35 @@ export default function ChartsPage() {
   const [columnMap, setColumnMap] = useState({}); // { column: "Name", xColumn: "Age", ... }
   const [multiColumns, setMultiColumns] = useState([]); // for heatmap
   const [generatedCharts, setGeneratedCharts] = useState([]); // { id, type, params, title }
+  const [savedCharts, setSavedCharts] = useState([]); // loaded from DB
+  const [loadingSaved, setLoadingSaved] = useState(true);
+
+  // Load saved charts from DB on mount
+  useEffect(() => {
+    if (!email || !filePath) return;
+    let cancelled = false;
+
+    async function loadSaved() {
+      setLoadingSaved(true);
+      try {
+        const res = await fetch(
+          `/api/fetchcharts?email=${encodeURIComponent(email)}&filepath=${encodeURIComponent(filePath)}`
+        );
+        if (!res.ok) throw new Error("Failed to load saved charts");
+        const json = await res.json();
+        if (!cancelled) {
+          setSavedCharts(json.charts || []);
+        }
+      } catch (err) {
+        console.error("Error loading saved charts:", err);
+      } finally {
+        if (!cancelled) setLoadingSaved(false);
+      }
+    }
+
+    loadSaved();
+    return () => { cancelled = true; };
+  }, [email, filePath]);
 
   // Detect numeric vs string columns
   const { numericCols, stringCols } = useMemo(() => {
@@ -69,7 +98,7 @@ export default function ChartsPage() {
   };
 
   const handleGenerate = () => {
-    const params = { sheet, email };
+    const params = { sheet, email, filePath };
 
     if (selectedChart === "heatmap") {
       if (multiColumns.length < 2) return alert("Select at least 2 numeric columns for heatmap");
@@ -112,7 +141,7 @@ export default function ChartsPage() {
       {/* Top Nav */}
       <nav style={{ background: theme.panel, borderBottom: `1px solid ${theme.border}`, padding: "12px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Link to="/" style={{ color: theme.accentDark, textDecoration: "none", fontWeight: 600, fontSize: 16 }}>Data Cleaner</Link>
+          <Link to="/" style={{ color: theme.accentDark, textDecoration: "none", fontWeight: 600, fontSize: 16 }}>Data Cleaner & Visualiser</Link>
           <span style={{ color: theme.textMuted, fontSize: 14 }}>/</span>
           <span style={{ fontSize: 14, color: theme.textMuted }}>{filePath}</span>
         </div>
@@ -237,10 +266,27 @@ export default function ChartsPage() {
           </button>
         </section>
 
+        {/* Saved Charts from DB */}
+        {loadingSaved && (
+          <section style={{ background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: theme.textMuted, textAlign: "center" }}>Loading saved charts...</p>
+          </section>
+        )}
+        {!loadingSaved && savedCharts.length > 0 && (
+          <section style={{ marginBottom: 20 }}>
+            <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600 }}>Saved Charts ({savedCharts.length})</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {savedCharts.map((sc) => (
+                <ChartViewer key={`saved-${sc.id}`} type={sc.type} savedData={sc} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Generated Charts */}
         {generatedCharts.length > 0 && (
           <section>
-            <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600 }}>Your Charts</h2>
+            <h2 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600 }}>Newly Generated</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {generatedCharts.map((gc) => (
                 <ChartViewer key={gc.id} type={gc.type} params={gc.params} />

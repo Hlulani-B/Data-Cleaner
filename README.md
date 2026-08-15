@@ -1,4 +1,4 @@
-# Data-Cleaner
+# Data Cleaner & Visualiser
 An interactive, browser-based data scrubbing and visualization workspace.
 
 
@@ -28,7 +28,7 @@ Enterprise ETL Platforms: Commercial data-wrangling software carries steep licen
 # USERS CAN CLEAN WITH  NO CODE REQUIRED.
 ### The Solution
 
-Data-Cleaner bridge this gap by offering a responsive, browser-based workspace that combines the speed and deterministic execution of programmatic cleaning with an intuitive, code-free interface. It empowers users to inspect, execute batch transformations, and visualize datasets seamlessly within a single workflow.
+Data-Cleaner & Visualiser bridge this gap by offering a responsive, browser-based workspace that combines the speed and deterministic execution of programmatic cleaning with an intuitive, code-free interface. It empowers users to inspect, execute batch transformations, and visualize datasets seamlessly within a single workflow.
 
 
 ##  What This Project Taught Me

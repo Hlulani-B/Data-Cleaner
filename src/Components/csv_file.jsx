@@ -47,7 +47,7 @@ function CsvFile() {
       <div className="app-layout">
         <nav className="top-nav">
           <div className="nav-tabs">
-            <Link to="/" className="nav-tab">Data Cleaner</Link>
+            <Link to="/" className="nav-tab">Data Cleaner & Visualiser</Link>
             <span className="nav-tab active">CSV</span>
           </div>
         </nav>

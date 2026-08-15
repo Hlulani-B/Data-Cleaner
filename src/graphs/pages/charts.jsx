@@ -26,24 +26,26 @@ const theme = {
  * ChartViewer
  *
  * Props:
- *   type    - one of: bar | histogram | pie | scatter | line | box | heatmap | stackedBar | area | bubble | violin
- *   params  - object passed straight through to POST /api/charts as { chart: type, ...params }
- *             e.g. { sheet, column, email, description } for bar/histogram/pie
- *                  { sheet, xColumn, yColumn, email, description } for scatter/line/area
- *                  { sheet, xColumn, yColumn, sizeColumn, email, description } for bubble
- *                  { sheet, categoryColumn, valueColumn, email, description } for box/violin
- *                  { sheet, columns, email, description } for heatmap
- *                  { sheet, categoryColumn, groupColumn, email, description } for stackedBar
- *   apiUrl  - optional override, defaults to "/api/charts"
+ *   type      - one of: bar | histogram | pie | scatter | line | box | heatmap | stackedBar | area | bubble | violin
+ *   params    - object passed to POST /api/charts (for new chart generation)
+ *   savedData - pre-loaded chart data from DB (skips API call, renders directly)
+ *   apiUrl    - optional override, defaults to "/api/charts"
  */
-export default function ChartViewer({ type, params, apiUrl = "/api/charts" }) {
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function ChartViewer({ type, params, savedData, apiUrl = "/api/charts" }) {
+  const [result, setResult] = useState(savedData || null);
+  const [loading, setLoading] = useState(!savedData);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const chartRef = useRef(null);
 
   useEffect(() => {
+    // If savedData is provided, render directly from DB data — no API call
+    if (savedData) {
+      setResult(savedData);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function fetchChart() {
@@ -93,7 +95,7 @@ export default function ChartViewer({ type, params, apiUrl = "/api/charts" }) {
       }
     }
 
-    if (type && params) fetchChart();
+    if (type && params && !savedData) fetchChart();
 
     return () => {
       cancelled = true;

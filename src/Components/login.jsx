@@ -50,7 +50,7 @@ function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1 className="login-title">Data Cleaner</h1>
+        <h1 className="login-title">Data Cleaner & Visualiser</h1>
         <p className="login-subtitle">Sign in to clean and process your spreadsheets</p>
 
         {error && <div className="login-error">{error}</div>}

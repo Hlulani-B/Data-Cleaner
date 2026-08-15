@@ -17,10 +17,31 @@ import { areaChart } from "../src/graphs/functions/areachart.js";
 import { bubbleChart } from "../src/graphs/functions/bubblechart.js";
 import { violinPlot } from "../src/graphs/functions/violinplot.js";
 import XLSX from "xlsx";
+import { Pool } from "pg";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 function toSheet(data) {
   return XLSX.utils.json_to_sheet(data);
 }
+
+// chart type key -> DB table name
+const TABLE_MAP = {
+  bar: "bargraph",
+  histogram: "histogram",
+  pie: "piechart",
+  scatter: "scatterplot",
+  line: "linegraph",
+  box: "boxplot",
+  heatmap: "heatmap",
+  stackedBar: "stackedbar",
+  area: "areachart",
+  bubble: "bubblechart",
+  violin: "violinplot",
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -28,7 +49,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { chart: bodyChart, sheet, ...rest } = req.body || {};
+    const { chart: bodyChart, sheet, filePath, ...rest } = req.body || {};
 
     // Determine chart type: from body, or from URL path (for Vercel rewrites)
     let chart = bodyChart;
@@ -81,6 +102,21 @@ export default async function handler(req, res) {
         break;
       default:
         return res.status(400).json({ error: `unknown chart type: ${chart}` });
+    }
+
+    // Fix filepath in DB — chart functions store JSON.stringify(sheet) by mistake
+    if (filePath && rest.email) {
+      const table = TABLE_MAP[chart];
+      if (table) {
+        try {
+          await pool.query(
+            `UPDATE ${table} SET filepath = $1 WHERE email = $2 AND id = (SELECT MAX(id) FROM ${table} WHERE email = $2)`,
+            [filePath, rest.email]
+          );
+        } catch (err) {
+          console.error('Failed to fix filepath in DB:', err.message);
+        }
+      }
     }
 
     res.status(200).json({ data: result });
