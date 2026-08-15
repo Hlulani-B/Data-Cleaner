@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
@@ -442,10 +442,18 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [aiSearchLoading, setAiSearchLoading] = useState(false); // AI search in progress
   const [aiSearchError, setAiSearchError] = useState(null); // AI search error message
   const [getValuesResult, setGetValuesResult] = useState(null); // { column, values[] }
+  const [saveStatus, setSaveStatus] = useState(""); // "" | "saving" | "saved" | "error"
+  const sheetsRef = useRef(file?.sheets || {}); // always-current sheets for persist
+
+  // Keep sheetsRef in sync with the active sheet's latest data
+  useEffect(() => {
+    sheetsRef.current = { ...sheetsRef.current, [activeSheet]: data };
+  }, [data, activeSheet]);
 
   // Load sheet data when sheet changes
   useEffect(() => {
     if (file && file.sheets) {
+      sheetsRef.current = { ...file.sheets };
       const sheetData = file.sheets[activeSheet] || [];
       setData(sheetData);
       setHistory([]);
@@ -476,10 +484,12 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   // Reset search when sheet changes
   useEffect(() => { setSearchQuery(""); }, [activeSheet]);
 
-  // Save current file state to Neon (no localStorage for file data)
+  // Save current file state to Neon — uses sheetsRef for always-current data
   const persistFile = useCallback(
     (newSheetData) => {
-      const allSheets = { ...(file.sheets || {}), [activeSheet]: newSheetData };
+      const allSheets = { ...sheetsRef.current, [activeSheet]: newSheetData };
+      sheetsRef.current = allSheets; // update ref immediately
+      setSaveStatus("saving");
       fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -489,7 +499,16 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
           sheets: allSheets,
           sheetNames: file.sheetNames || [],
         }),
-      }).catch(() => {});
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error("save failed");
+          setSaveStatus("saved");
+          setTimeout(() => setSaveStatus(""), 2000);
+        })
+        .catch(() => {
+          setSaveStatus("error");
+          setTimeout(() => setSaveStatus(""), 3000);
+        });
     },
     [file, activeSheet]
   );
@@ -664,6 +683,15 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
           <span className="nav-tab active">{navLabel}</span>
         </div>
         <div className="nav-actions">
+          {saveStatus === "saving" && (
+            <span style={{ fontSize: 12, color: "#a89279", marginRight: 8 }}>Saving…</span>
+          )}
+          {saveStatus === "saved" && (
+            <span style={{ fontSize: 12, color: "#6f9e6f", marginRight: 8 }}>✓ Saved</span>
+          )}
+          {saveStatus === "error" && (
+            <span style={{ fontSize: 12, color: "#c06060", marginRight: 8 }}>Save failed</span>
+          )}
           <button
             className="export-btn"
             onClick={() =>
