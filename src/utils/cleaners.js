@@ -1,5 +1,20 @@
 /* ─── Client-side cleaning utilities (mirror the api/functions/ logic) ─── */
 
+/** Robust date parser: handles JS Date, Excel serial numbers, and date strings. */
+function toJSDate(val) {
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  if (typeof val === "number") {
+    // Excel serial number: 25569 = days between Excel epoch (1899-12-30) and Unix epoch (1970-01-01)
+    const d = new Date((val - 25569) * 86400 * 1000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof val === "string" && val.trim() !== "") {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
 /** Trim: remove leading/trailing spaces, collapse internal spaces */
 export function trimData(data) {
   if (data.length === 0) return data;
@@ -169,10 +184,8 @@ export function removeColumn(data, column) {
 export function standardizeDates(data, column, format = "YYYY-MM-DD") {
   return data.map((row) => {
     const out = { ...row };
-    const val = out[column];
-    if (typeof val !== "string" || val.trim() === "") return out;
-    const date = new Date(val);
-    if (isNaN(date.getTime())) return out;
+    const date = toJSDate(out[column]);
+    if (!date) return out;
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, "0");
     const dd = String(date.getDate()).padStart(2, "0");
@@ -517,38 +530,38 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 export function extractYear(data, column, newColumn) {
   return data.map((row) => {
-    const d = new Date(row[column]);
-    return { ...row, [newColumn]: isNaN(d) ? "" : d.getFullYear() };
+    const d = toJSDate(row[column]);
+    return { ...row, [newColumn]: d ? d.getFullYear() : "" };
   });
 }
 
 export function extractMonth(data, column, newColumn) {
   return data.map((row) => {
-    const d = new Date(row[column]);
-    return { ...row, [newColumn]: isNaN(d) ? "" : d.getMonth() + 1 };
+    const d = toJSDate(row[column]);
+    return { ...row, [newColumn]: d ? d.getMonth() + 1 : "" };
   });
 }
 
 export function extractDay(data, column, newColumn) {
   return data.map((row) => {
-    const d = new Date(row[column]);
-    return { ...row, [newColumn]: isNaN(d) ? "" : d.getDate() };
+    const d = toJSDate(row[column]);
+    return { ...row, [newColumn]: d ? d.getDate() : "" };
   });
 }
 
 export function extractDayOfWeek(data, column, newColumn) {
   return data.map((row) => {
-    const d = new Date(row[column]);
-    return { ...row, [newColumn]: isNaN(d) ? "" : DAY_NAMES[d.getDay()] };
+    const d = toJSDate(row[column]);
+    return { ...row, [newColumn]: d ? DAY_NAMES[d.getDay()] : "" };
   });
 }
 
 export function dateDifference(data, colA, colB, newColumn, unit = "days") {
   const msPerUnit = { days: 86400000, hours: 3600000, minutes: 60000 };
   return data.map((row) => {
-    const a = new Date(row[colA]);
-    const b = new Date(row[colB]);
-    return { ...row, [newColumn]: (!isNaN(a) && !isNaN(b)) ? Math.round((b - a) / (msPerUnit[unit] || msPerUnit.days)) : "" };
+    const a = toJSDate(row[colA]);
+    const b = toJSDate(row[colB]);
+    return { ...row, [newColumn]: (a && b) ? Math.round((b - a) / (msPerUnit[unit] || msPerUnit.days)) : "" };
   });
 }
 
@@ -556,8 +569,8 @@ export function addDays(data, column, days) {
   const n = Number(days);
   return data.map((row) => {
     const out = { ...row };
-    const d = new Date(out[column]);
-    if (!isNaN(d)) {
+    const d = toJSDate(out[column]);
+    if (d) {
       d.setDate(d.getDate() + n);
       out[column] = d.toISOString().split("T")[0];
     }
@@ -568,8 +581,8 @@ export function addDays(data, column, days) {
 export function ageFromBirthdate(data, column, newColumn) {
   const today = new Date();
   return data.map((row) => {
-    const d = new Date(row[column]);
-    if (isNaN(d)) return { ...row, [newColumn]: "" };
+    const d = toJSDate(row[column]);
+    if (!d) return { ...row, [newColumn]: "" };
     let age = today.getFullYear() - d.getFullYear();
     const monthDiff = today.getMonth() - d.getMonth();
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d.getDate())) age--;
@@ -579,8 +592,8 @@ export function ageFromBirthdate(data, column, newColumn) {
 
 export function isWeekend(data, column, newColumn) {
   return data.map((row) => {
-    const d = new Date(row[column]);
-    if (isNaN(d)) return { ...row, [newColumn]: "" };
+    const d = toJSDate(row[column]);
+    if (!d) return { ...row, [newColumn]: "" };
     const day = d.getDay();
     return { ...row, [newColumn]: day === 0 || day === 6 };
   });
