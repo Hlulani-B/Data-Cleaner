@@ -3,55 +3,84 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
 import ValuesPanel from "./values";
+// ── Your class files (user_choice + automatic) ──
 import { Values } from "../functions/user_choice/getValues";
 import { Clean } from "../functions/automatic/clean";
-import {
-  removeDuplicates, detectDatatypes,
-  removeEmptyRows, fillEmptyValues, lowercaseColumn, uppercaseColumn, properCaseColumn,
-  removeColumn, standardizeDates, convertType,
-  splitColumn, joinColumns, concatenateColumns,
-  mathSingleInPlace, mathSingleNewCol, mathCumulativeSum,
-  mathTwoColumn, mathSumColumns, mathAverageColumns,
-  replaceText, searchRows, absoluteColumn,
-  renameColumn, duplicateColumn, reorderColumns, filterRows, sortRows, sampleRows,
-  extractYear, extractMonth, extractDay, extractDayOfWeek, dateDifference, addDays,
-  ageFromBirthdate, isWeekend,
-  currencyFormat, percentageFormat, labelEncode, oneHotEncode,
-  emailValidityCheck, phoneFormatCheck, flagOutliers,
-  removeSpecialCharacters, removeNumbers, collapseWhitespace,
-  padLeft, padRight, truncateText, extractSubstring, reverseText,
-  countCharacters, countWords, containsCheck, startsWithCheck, endsWithCheck,
-  regexExtract, regexReplace, sentenceCase,
-} from "../utils/cleaners";
+import { Upper } from "../functions/user_choice/upper";
+import { Lower } from "../functions/user_choice/lower";
+import { Proper } from "../functions/user_choice/proper";
+import { RemoveColumn } from "../functions/user_choice/removeColumn";
+import { RemoveEmpty } from "../functions/user_choice/removeEmpty";
+import { MissingValues } from "../functions/user_choice/missingValues";
+import { DateStandard } from "../functions/user_choice/dateStandard";
+import { TypeConversion } from "../functions/user_choice/typeConversion";
+import { Duplicate } from "../functions/automatic/duplicates";
+import { Search } from "../functions/user_choice/search";
+import Separate from "../functions/user_choice/seperate";
+import Join from "../functions/user_choice/join";
+import Concatenate from "../functions/user_choice/concatenate";
+import Replace from "../functions/user_choice/replace";
+import AbsoluteValue from "../functions/user_choice/absolute";
+import ColumnRowOperations from "../functions/user_choice/columnRowOperations";
+import DateOperations from "../functions/user_choice/dateOperations";
+import TextOperations from "../functions/user_choice/textOperations";
+import FormattingValidation from "../functions/user_choice/formattingValidation";
+import MathOperations from "../functions/user_choice/math";
+import { fillEmptyValues } from "../utils/cleaners";
 
+// ── Class instances ──
 const valuesOps = new Values();
+const upperInst = new Upper();
+const lowerInst = new Lower();
+const properInst = new Proper();
+const removeColumnInst = new RemoveColumn();
+const removeEmptyInst = new RemoveEmpty();
+const missingValuesInst = new MissingValues();
+const dateStandardInst = new DateStandard();
+const typeConversionInst = new TypeConversion();
+const duplicateInst = new Duplicate();
+const searchInst = new Search();
+const separateInst = new Separate();
+const joinInst = new Join();
+const concatenateInst = new Concatenate();
+const replaceInst = new Replace();
+const absoluteInst = new AbsoluteValue();
+const colRowOps = new ColumnRowOperations();
+const dateOps = new DateOperations();
+const textOps = new TextOperations();
+const fmtVal = new FormattingValidation();
+const mathOps = new MathOperations();
 
-/* ─── Client-side function runners ─── */
+// Helper: data → sheet → class method → data
+const run = (data, fn) => XLSX.utils.sheet_to_json(fn(XLSX.utils.json_to_sheet(data)), { defval: "" });
+
+/* ─── Client-side function runners (all use YOUR class files) ─── */
 const FUNCTION_RUNNERS = {
-  removeEmpty: (data) => removeEmptyRows(data),
-  duplicates: (data) => removeDuplicates(data),
-  lower: (data, col) => lowercaseColumn(data, col),
-  upper: (data, col) => uppercaseColumn(data, col),
-  proper: (data, col) => properCaseColumn(data, col),
-  removeColumn: (data, col) => removeColumn(data, col),
-  dateStandard: (data, col, extra) => standardizeDates(data, col, extra.format || "YYYY-MM-DD"),
-  typeConversion: (data, col, extra) => convertType(data, col, extra.targetType || "string"),
-  separate: (data, col, extra) => splitColumn(
-    data, col, extra.delimiter || ",", Number(extra.occurrence) || 1,
+  removeEmpty: (data) => run(data, (s) => removeEmptyInst.remove_empty(s)),
+  duplicates: (data) => run(data, (s) => duplicateInst.duplicate(s)),
+  lower: (data, col) => run(data, (s) => lowerInst.lower(s, col)),
+  upper: (data, col) => run(data, (s) => upperInst.upper(s, col)),
+  proper: (data, col) => run(data, (s) => properInst.proper(s, col)),
+  removeColumn: (data, col) => run(data, (s) => removeColumnInst.remove_column(s, col)),
+  dateStandard: (data, col, extra) => run(data, (s) => dateStandardInst.dateStandard(s, col, extra.format || "YYYY-MM-DD")),
+  typeConversion: (data, col, extra) => run(data, (s) => typeConversionInst.typeConversion(s, col, extra.targetType || "string")),
+  separate: (data, col, extra) => run(data, (s) => separateInst.separate(
+    s, col, extra.delimiter || ",", Number(extra.occurrence) || 1,
     extra.newColumn1 || `${col}_1`, extra.newColumn2 || `${col}_2`
-  ),
-  join: (data, _col, extra) => joinColumns(
-    data, (extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : []), extra?.newColumn || "joined", extra?.delimiter || " "
-  ),
-  concatenate: (data, _col, extra) => concatenateColumns(
-    data, (extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : []), extra?.newColumn || "concatenated", extra?.customString || ""
-  ),
+  )),
+  join: (data, _col, extra) => run(data, (s) => joinInst.join(
+    s, extra?.newColumn || "joined",
+    extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : [],
+    extra?.delimiter || " "
+  )),
+  concatenate: (data, _col, extra) => run(data, (s) => concatenateInst.concat(
+    s, extra?.newColumn || "concatenated",
+    extra && Array.isArray(extra.selectedColumns) ? extra.selectedColumns : []
+  )),
   math: (data, _col, extra) => runMathOp(data, extra?.mathOp, extra),
-  // Values operations (operate on a sheet-converted copy)
   getValues: (data, col) => {
     const sheet = XLSX.utils.json_to_sheet(data);
     const unique = valuesOps.getValues(sheet, col);
-    // Return data unchanged — result shown as an alert/info
     return { __getValuesResult: unique, data };
   },
   replaceValues: (data, col, extra) => {
@@ -69,71 +98,62 @@ const FUNCTION_RUNNERS = {
   fillEmpty: (data, col, extra) => fillEmptyValues(
     data, col, extra.strategy || "value", extra.customValue ?? ""
   ),
-  // Replace & search
-  replace: (data, col, extra) => replaceText(
-    data, col, extra.findValue ?? "", extra.replaceWith ?? "", extra.occurrence
-  ),
-  search: (data, _col, extra) => searchRows(data, extra.keyword ?? ""),
-  absolute: (data, col) => absoluteColumn(data, col),
-  // Column / row operations
-  renameColumn: (data, col, extra) => renameColumn(data, col, extra.newName ?? `${col}_renamed`),
-  duplicateColumn: (data, col, extra) => duplicateColumn(data, col, extra.newColumn ?? `${col}_copy`),
-  reorderColumns: (data, _col, extra) => reorderColumns(
-    data, extra && Array.isArray(extra.orderedColumns) ? extra.orderedColumns : Object.keys(data[0] || {})
-  ),
-  filterRows: (data, col, extra) => filterRows(
-    data, col, extra.condition || "equals", extra.value ?? ""
-  ),
-  sortRows: (data, col, extra) => sortRows(data, col, extra.direction || "asc"),
-  sampleRows: (data, _col, extra) => sampleRows(data, extra.count ?? 10, extra.mode || "first"),
-  // Date operations
-  extractYear: (data, col, extra) => extractYear(data, col, extra.newColumn ?? `${col}_year`),
-  extractMonth: (data, col, extra) => extractMonth(data, col, extra.newColumn ?? `${col}_month`),
-  extractDay: (data, col, extra) => extractDay(data, col, extra.newColumn ?? `${col}_day`),
-  extractDayOfWeek: (data, col, extra) => extractDayOfWeek(data, col, extra.newColumn ?? `${col}_weekday`),
-  dateDifference: (data, _col, extra) => dateDifference(
-    data, extra.columnA, extra.columnB, extra.newColumn ?? "date_diff", extra.unit || "days"
-  ),
-  addDays: (data, col, extra) => addDays(data, col, extra.days ?? 0),
-  ageFromBirthdate: (data, col, extra) => ageFromBirthdate(data, col, extra.newColumn ?? `${col}_age`),
-  isWeekend: (data, col, extra) => isWeekend(data, col, extra.newColumn ?? `${col}_weekend`),
-  // Formatting & validation
-  currencyFormat: (data, col, extra) => currencyFormat(
-    data, col, extra.symbol ?? "$", extra.newColumn || col
-  ),
-  percentageFormat: (data, col, extra) => percentageFormat(
-    data, col, extra.decimals ?? 1, extra.newColumn || col
-  ),
-  labelEncode: (data, col) => labelEncode(data, col),
-  oneHotEncode: (data, col) => oneHotEncode(data, col),
-  emailValidityCheck: (data, col, extra) => emailValidityCheck(data, col, extra.newColumn ?? `${col}_email_valid`),
-  phoneFormatCheck: (data, col, extra) => phoneFormatCheck(data, col, extra.newColumn ?? `${col}_phone_valid`),
-  flagOutliers: (data, col, extra) => flagOutliers(
-    data, col, extra.newColumn ?? `${col}_outlier`, extra.stdDevThreshold ?? 2
-  ),
-  // Text operations
-  removeSpecialCharacters: (data, col) => removeSpecialCharacters(data, col),
-  removeNumbers: (data, col) => removeNumbers(data, col),
-  collapseWhitespace: (data, col) => collapseWhitespace(data, col),
-  padLeft: (data, col, extra) => padLeft(data, col, extra.length ?? 5, extra.padChar ?? "0"),
-  padRight: (data, col, extra) => padRight(data, col, extra.length ?? 5, extra.padChar ?? " "),
-  truncateText: (data, col, extra) => truncateText(data, col, extra.maxLength ?? 10),
-  extractSubstring: (data, col, extra) => extractSubstring(
-    data, col, extra.newColumn ?? `${col}_substring`, extra.start ?? 0, extra.end ?? 10
-  ),
-  reverseText: (data, col) => reverseText(data, col),
-  countCharacters: (data, col, extra) => countCharacters(data, col, extra.newColumn ?? `${col}_char_count`),
-  countWords: (data, col, extra) => countWords(data, col, extra.newColumn ?? `${col}_word_count`),
-  containsCheck: (data, col, extra) => containsCheck(data, col, extra.newColumn ?? `${col}_contains`, extra.substring ?? ""),
-  startsWithCheck: (data, col, extra) => startsWithCheck(data, col, extra.newColumn ?? `${col}_starts_with`, extra.prefix ?? ""),
-  endsWithCheck: (data, col, extra) => endsWithCheck(data, col, extra.newColumn ?? `${col}_ends_with`, extra.suffix ?? ""),
-  regexExtract: (data, col, extra) => regexExtract(
-    data, col, extra.newColumn ?? `${col}_regex_extract`, extra.pattern ?? ".*", extra.flags ?? ""
-  ),
-  regexReplace: (data, col, extra) => regexReplace(
-    data, col, extra.pattern ?? ".*", extra.replaceWith ?? "", extra.flags ?? "g"
-  ),
-  sentenceCase: (data, col) => sentenceCase(data, col),
+  replace: (data, col, extra) => run(data, (s) => replaceInst.replace(
+    s, col, extra.findValue ?? "", extra.replaceWith ?? "", extra.occurrence
+  )),
+  search: (data, _col, extra) => searchInst.search(data, extra.keyword ?? ""),
+  absolute: (data, col) => run(data, (s) => absoluteInst.absolute(s, col)),
+  renameColumn: (data, col, extra) => run(data, (s) => colRowOps.renameColumn(s, col, extra.newName ?? `${col}_renamed`)),
+  duplicateColumn: (data, col, extra) => run(data, (s) => colRowOps.duplicateColumn(s, col, extra.newColumn ?? `${col}_copy`)),
+  reorderColumns: (data, _col, extra) => run(data, (s) => colRowOps.reorderColumns(
+    s, extra && Array.isArray(extra.orderedColumns) ? extra.orderedColumns : Object.keys(data[0] || {})
+  )),
+  filterRows: (data, col, extra) => run(data, (s) => colRowOps.filterRows(
+    s, col, extra.condition || "equals", extra.value ?? ""
+  )),
+  sortRows: (data, col, extra) => run(data, (s) => colRowOps.sortRows(s, col, extra.direction || "asc")),
+  sampleRows: (data, _col, extra) => run(data, (s) => colRowOps.sampleRows(s, extra.count ?? 10, extra.mode || "first")),
+  extractYear: (data, col, extra) => run(data, (s) => dateOps.extractYear(s, col, extra.newColumn ?? `${col}_year`)),
+  extractMonth: (data, col, extra) => run(data, (s) => dateOps.extractMonth(s, col, extra.newColumn ?? `${col}_month`)),
+  extractDay: (data, col, extra) => run(data, (s) => dateOps.extractDay(s, col, extra.newColumn ?? `${col}_day`)),
+  extractDayOfWeek: (data, col, extra) => run(data, (s) => dateOps.extractDayOfWeek(s, col, extra.newColumn ?? `${col}_weekday`)),
+  dateDifference: (data, _col, extra) => run(data, (s) => dateOps.dateDifference(
+    s, extra.columnA, extra.columnB, extra.newColumn ?? "date_diff", extra.unit || "days"
+  )),
+  addDays: (data, col, extra) => run(data, (s) => dateOps.addDays(s, col, extra.days ?? 0)),
+  ageFromBirthdate: (data, col, extra) => run(data, (s) => dateOps.ageFromBirthdate(s, col, extra.newColumn ?? `${col}_age`)),
+  isWeekend: (data, col, extra) => run(data, (s) => dateOps.isWeekend(s, col, extra.newColumn ?? `${col}_weekend`)),
+  currencyFormat: (data, col, extra) => run(data, (s) => fmtVal.currencyFormat(s, col, extra.symbol ?? "$")),
+  percentageFormat: (data, col, extra) => run(data, (s) => fmtVal.percentageFormat(s, col, extra.decimals ?? 1)),
+  labelEncode: (data, col) => run(data, (s) => fmtVal.labelEncode(s, col)),
+  oneHotEncode: (data, col) => run(data, (s) => fmtVal.oneHotEncode(s, col)),
+  emailValidityCheck: (data, col, extra) => run(data, (s) => fmtVal.emailValidityCheck(s, col, extra.newColumn ?? `${col}_email_valid`)),
+  phoneFormatCheck: (data, col, extra) => run(data, (s) => fmtVal.phoneFormatCheck(s, col, extra.newColumn ?? `${col}_phone_valid`)),
+  flagOutliers: (data, col, extra) => run(data, (s) => fmtVal.flagOutliers(
+    s, col, extra.newColumn ?? `${col}_outlier`, extra.stdDevThreshold ?? 2
+  )),
+  removeSpecialCharacters: (data, col) => run(data, (s) => textOps.removeSpecialCharacters(s, col)),
+  removeNumbers: (data, col) => run(data, (s) => textOps.removeNumbers(s, col)),
+  collapseWhitespace: (data, col) => run(data, (s) => textOps.collapseWhitespace(s, col)),
+  padLeft: (data, col, extra) => run(data, (s) => textOps.padLeft(s, col, extra.length ?? 5, extra.padChar ?? "0")),
+  padRight: (data, col, extra) => run(data, (s) => textOps.padRight(s, col, extra.length ?? 5, extra.padChar ?? " ")),
+  truncateText: (data, col, extra) => run(data, (s) => textOps.truncate(s, col, extra.maxLength ?? 10)),
+  extractSubstring: (data, col, extra) => run(data, (s) => textOps.extractSubstring(
+    s, col, extra.newColumn ?? `${col}_substring`, extra.start ?? 0, extra.end ?? 10
+  )),
+  reverseText: (data, col) => run(data, (s) => textOps.reverseText(s, col)),
+  countCharacters: (data, col, extra) => run(data, (s) => textOps.countCharacters(s, col, extra.newColumn ?? `${col}_char_count`)),
+  countWords: (data, col, extra) => run(data, (s) => textOps.countWords(s, col, extra.newColumn ?? `${col}_word_count`)),
+  containsCheck: (data, col, extra) => run(data, (s) => textOps.containsCheck(s, col, extra.newColumn ?? `${col}_contains`, extra.substring ?? "")),
+  startsWithCheck: (data, col, extra) => run(data, (s) => textOps.startsWith(s, col, extra.newColumn ?? `${col}_starts_with`, extra.prefix ?? "")),
+  endsWithCheck: (data, col, extra) => run(data, (s) => textOps.endsWith(s, col, extra.newColumn ?? `${col}_ends_with`, extra.suffix ?? "")),
+  regexExtract: (data, col, extra) => run(data, (s) => textOps.regexExtract(
+    s, col, extra.newColumn ?? `${col}_regex_extract`, extra.pattern ?? ".*", extra.flags ?? ""
+  )),
+  regexReplace: (data, col, extra) => run(data, (s) => textOps.regexReplace(
+    s, col, extra.pattern ?? ".*", extra.replaceWith ?? "", extra.flags ?? "g"
+  )),
+  sentenceCase: (data, col) => run(data, (s) => textOps.sentenceCase(s, col)),
 };
 
 /* ─── Math Operations Catalogue ─── */
@@ -166,7 +186,7 @@ const MATH_OPS = [
   { key: "averageColumns", label: "Average Columns", type: "multiCol" },
 ];
 
-/* ─── Math Runner ─── */
+/* ─── Math Runner (uses MathOperations class) ─── */
 function runMathOp(data, opKey, extra) {
   const op = MATH_OPS.find((o) => o.key === opKey);
   if (!op) throw new Error(`Unknown math operation: ${opKey}`);
@@ -177,24 +197,29 @@ function runMathOp(data, opKey, extra) {
   const param = Number(extra?.paramValue);
   const cols = extra?.selectedColumns || [];
 
-  switch (op.type) {
-    case "singleInPlace":
-      return mathSingleInPlace(data, col, opKey);
-    case "singleParam":
-      return mathSingleInPlace(data, col, opKey, param);
-    case "singleNewCol":
-      if (opKey === "cumulativeSum") return mathCumulativeSum(data, col, newCol);
-      return mathSingleNewCol(data, col, newCol, opKey);
-    case "singleNewColParam":
-      return mathSingleNewCol(data, col, newCol, opKey, param);
-    case "twoCol":
-      return mathTwoColumn(data, colA, colB, newCol, opKey);
-    case "multiCol":
-      if (opKey === "sumColumns") return mathSumColumns(data, cols, newCol);
-      return mathAverageColumns(data, cols, newCol);
-    default:
-      throw new Error(`Unsupported math type: ${op.type}`);
-  }
+  return run(data, (s) => {
+    switch (op.type) {
+      case "singleInPlace": return mathOps[opKey](s, col);
+      case "singleParam": return mathOps[opKey](s, col, param);
+      case "singleNewCol":
+        if (opKey === "cumulativeSum") return mathOps.cumulativeSum(s, col, newCol);
+        if (opKey === "squareRoot") return mathOps.squareRoot(s, col, newCol);
+        return mathOps[opKey](s, col, newCol);
+      case "singleNewColParam":
+        if (opKey === "power") return mathOps.power(s, col, param, newCol);
+        if (opKey === "log") return mathOps.log(s, col, newCol, param);
+        return mathOps[opKey](s, col, param, newCol);
+      case "twoCol":
+        if (opKey === "percentageChange") return mathOps.percentageChange(s, colA, colB, newCol);
+        return mathOps[opKey](s, colA, colB, newCol);
+      case "multiCol":
+        if (opKey === "sumColumns") return mathOps.sumColumns(s, cols, newCol);
+        if (opKey === "averageColumns") return mathOps.averageColumns(s, cols, newCol);
+        return mathOps[opKey](s, cols, newCol);
+      default:
+        throw new Error(`Unsupported math type: ${op.type}`);
+    }
+  });
 }
 
 const FUNCTION_CATEGORIES = [
