@@ -451,10 +451,13 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       setHistory([]);
       setDrafts([]);
       // Check persisted clean-done flag for this file + sheet
-      const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-      const found = stored.find((f) => String(f.id) === String(file.id));
-      const cleaned = found?.initialCleaned?.[activeSheet] || false;
-      setInitialCleanDone(cleaned);
+      try {
+        const flags = JSON.parse(localStorage.getItem("dc_cleaned") || "{}");
+        const cleaned = flags[String(file.id)]?.[activeSheet] || false;
+        setInitialCleanDone(cleaned);
+      } catch {
+        setInitialCleanDone(false);
+      }
     }
   }, [file, activeSheet]);
 
@@ -473,44 +476,20 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   // Reset search when sheet changes
   useEffect(() => { setSearchQuery(""); }, [activeSheet]);
 
-  // Save current file state back to localStorage + Neon
+  // Save current file state to Neon (no localStorage for file data)
   const persistFile = useCallback(
     (newSheetData) => {
-      const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-      let idx = stored.findIndex((f) => String(f.id) === String(file.id));
-
-      // Fallback: match by filename + filetype (handles tempId → Neon ID swap)
-      if (idx === -1 && file.filename) {
-        idx = stored.findIndex(
-          (f) => f.filename === file.filename && f.filetype === file.filetype
-        );
-      }
-
-      // If file was loaded from Neon only, add it to localStorage
-      if (idx === -1 && file.sheets) {
-        stored.unshift({ ...file });
-        idx = 0;
-      }
-
-      if (idx !== -1) {
-        stored[idx].sheets[activeSheet] = newSheetData;
-        localStorage.setItem("dc_files", JSON.stringify(stored));
-
-        // Also save to Neon (fire-and-forget)
-        const email = localStorage.getItem("dc_userEmail");
-        if (email) {
-          fetch("/api/files", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "update",
-              fileId: Number(file.id),
-              sheets: stored[idx].sheets,
-              sheetNames: stored[idx].sheetNames,
-            }),
-          }).catch(() => {});
-        }
-      }
+      const allSheets = { ...(file.sheets || {}), [activeSheet]: newSheetData };
+      fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          fileId: Number(file.id),
+          sheets: allSheets,
+          sheetNames: file.sheetNames || [],
+        }),
+      }).catch(() => {});
     },
     [file, activeSheet]
   );
@@ -552,13 +531,12 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     setInitialCleanDone(true);
 
     // Persist clean-done flag so it never runs again for this file + sheet
-    const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-    const idx = stored.findIndex((f) => String(f.id) === String(file.id));
-    if (idx !== -1) {
-      if (!stored[idx].initialCleaned) stored[idx].initialCleaned = {};
-      stored[idx].initialCleaned[activeSheet] = true;
-      localStorage.setItem("dc_files", JSON.stringify(stored));
-    }
+    try {
+      const flags = JSON.parse(localStorage.getItem("dc_cleaned") || "{}");
+      if (!flags[String(file.id)]) flags[String(file.id)] = {};
+      flags[String(file.id)][activeSheet] = true;
+      localStorage.setItem("dc_cleaned", JSON.stringify(flags));
+    } catch {}
     setCleanStats({
       rowsBefore: beforeRows,
       rowsAfter: current.length,
@@ -2157,42 +2135,21 @@ function ExcelFile() {
   const [activeSheet, setActiveSheet] = useState("");
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-    let found = stored.find((f) => String(f.id) === String(fileId));
-
-    // Fallback: ID not found (tempId may have been replaced by Neon sync)
-    // Try the most recent Excel file in localStorage
-    if (!found) {
-      const excelFiles = stored.filter((f) => f.filetype === "excel");
-      if (excelFiles.length > 0) {
-        found = excelFiles.sort((a, b) => {
-          const ta = new Date(a.createdAt || 0).getTime();
-          const tb = new Date(b.createdAt || 0).getTime();
-          return tb - ta;
-        })[0];
-      }
-    }
-
-    if (found) {
-      setFile(found);
-      setActiveSheet(found.sheetNames[0] || "");
-    } else {
-      // Last resort: try loading from Neon
-      fetch("/api/files", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "get", fileId: Number(fileId) }),
+    // Load file data directly from Neon
+    fetch("/api/files", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "get", fileId: Number(fileId) }),
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.file) {
+          const f = { ...res.file, id: String(res.file.id) };
+          setFile(f);
+          setActiveSheet(f.sheetNames[0] || "");
+        }
       })
-        .then((r) => r.json())
-        .then((res) => {
-          if (res.file) {
-            const f = { ...res.file, id: String(res.file.id) };
-            setFile(f);
-            setActiveSheet(f.sheetNames[0] || "");
-          }
-        })
-        .catch(() => {});
-    }
+      .catch(() => {});
   }, [fileId]);
 
   if (!file) {

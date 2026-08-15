@@ -19,6 +19,8 @@ function Login() {
       localStorage.setItem("dc_username", user.displayName || user.email);
       localStorage.setItem("dc_userEmail", user.email);
       localStorage.setItem("dc_userPhoto", user.photoURL || "");
+      // Clean up any old file data from localStorage (now stored in Neon only)
+      localStorage.removeItem("dc_files");
 
       // Register user in Neon database
       try {

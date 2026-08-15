@@ -28,7 +28,7 @@ function Dashboard() {
         body: JSON.stringify({ email, name: name || email.split("@")[0] }),
       }).catch(() => {});
 
-      // Load files from Neon and merge with localStorage
+      // Load files from Neon only (no localStorage for file data)
       fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -36,55 +36,16 @@ function Dashboard() {
       })
         .then((r) => r.json())
         .then((res) => {
-          const neonFiles = res.files || [];
-          const localFiles = JSON.parse(localStorage.getItem("dc_files") || "[]");
-
-          if (neonFiles.length > 0) {
-            const neonIds = new Set(neonFiles.map((f) => String(f.id)));
-            const neonNames = new Set(neonFiles.map((f) => f.filename));
-
-            // Build merged list: start with Neon files
-            const merged = [...neonFiles];
-
-            // Keep local-only files (not yet in Neon) and
-            // replace tempIds with real Neon IDs when filename matches
-            for (const lf of localFiles) {
-              if (neonIds.has(String(lf.id))) continue; // already in Neon
-              const match = neonFiles.find(
-                (nf) => nf.filename === lf.filename && !merged.find((m) => String(m.id) === String(lf.id))
-              );
-              if (match) {
-                // Neon has same file by name — update Neon file's data if local has sheets
-                const idx = merged.findIndex((m) => String(m.id) === String(match.id));
-                if (idx !== -1 && lf.sheets && Object.keys(lf.sheets).length > 0) {
-                  merged[idx] = { ...merged[idx], sheets: lf.sheets, sheetNames: lf.sheetNames };
-                }
-              } else if (!neonNames.has(lf.filename)) {
-                // File only exists locally — keep it
-                merged.push(lf);
-              }
-            }
-
-            setFiles(merged);
-            localStorage.setItem("dc_files", JSON.stringify(merged));
-          } else {
-            // Neon returned nothing — fall back to localStorage
-            setFiles(localFiles);
-          }
+          setFiles(res.files || []);
         })
         .catch(() => {
-          const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-          setFiles(stored);
+          setFiles([]);
         });
-    } else {
-      const stored = JSON.parse(localStorage.getItem("dc_files") || "[]");
-      setFiles(stored);
     }
   }, []);
 
   const saveFiles = (updated) => {
     setFiles(updated);
-    localStorage.setItem("dc_files", JSON.stringify(updated));
   };
 
   const handleUpload = (e) => {
@@ -103,7 +64,6 @@ function Dashboard() {
         const name = file.name.toLowerCase();
         const ext = name.includes(".") ? name.split(".").pop() : "";
         const filetype = ext === "csv" ? "csv" : "excel";
-        const tempId = Date.now().toString();
 
         const sheets = {};
         workbook.SheetNames.forEach((sheetName) => {
@@ -119,52 +79,46 @@ function Dashboard() {
           return;
         }
 
-        const newFile = {
-          id: tempId,
-          filename: file.name,
-          filetype,
-          sheets,
-          sheetNames: workbook.SheetNames,
-          createdAt: new Date().toISOString(),
-        };
-
-        // Save locally first for instant UI
-        saveFiles([newFile, ...files]);
-        navigate(`/${filetype}/${tempId}`);
-
-        // Then save to Neon
         const email = localStorage.getItem("dc_userEmail");
-        if (email) {
-          fetch("/api/files", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "save",
-              filename: file.name,
-              filetype,
-              sheets,
-              sheetNames: workbook.SheetNames,
-              userEmail: email,
-            }),
-          })
-            .then((r) => {
-              if (!r.ok) throw new Error(`Server error: ${r.status}`);
-              return r.json();
-            })
-            .then((res) => {
-              if (res.file) {
-                // Read current localStorage (not stale closure)
-                const current = JSON.parse(localStorage.getItem("dc_files") || "[]");
-                const realId = String(res.file.id);
-                // Replace tempId with the real Neon id
-                const updated = current.map((f) =>
-                  f.id === tempId ? { ...f, id: realId } : f
-                );
-                saveFiles(updated);
-              }
-            })
-            .catch(() => {}); // localStorage still works if Neon fails
+        if (!email) {
+          alert("Please sign in first.");
+          return;
         }
+
+        // Save directly to Neon first — no localStorage for file data
+        fetch("/api/files", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save",
+            filename: file.name,
+            filetype,
+            sheets,
+            sheetNames: workbook.SheetNames,
+            userEmail: email,
+          }),
+        })
+          .then((r) => {
+            if (!r.ok) throw new Error(`Server error: ${r.status}`);
+            return r.json();
+          })
+          .then((res) => {
+            if (res.file) {
+              const realId = String(res.file.id);
+              // Add to file list in state
+              setFiles((prev) => [{
+                id: realId,
+                filename: file.name,
+                filetype,
+                sheetNames: workbook.SheetNames,
+                createdAt: new Date().toISOString(),
+              }, ...prev]);
+              navigate(`/${filetype}/${realId}`);
+            }
+          })
+          .catch((err) => {
+            alert("Failed to save file: " + err.message);
+          });
       } catch (err) {
         alert("Failed to parse file: " + err.message);
       }
@@ -175,13 +129,19 @@ function Dashboard() {
 
   const handleDelete = (id, e) => {
     e.stopPropagation();
-    saveFiles(files.filter((f) => f.id !== id));
-    // Also delete from Neon
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+    // Delete from Neon
     fetch("/api/files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete", fileId: Number(id) }),
-    }).catch(() => {}); // silent
+    }).catch(() => {});
+    // Clean up any local clean-done flags
+    try {
+      const flags = JSON.parse(localStorage.getItem("dc_cleaned") || "{}");
+      delete flags[String(id)];
+      localStorage.setItem("dc_cleaned", JSON.stringify(flags));
+    } catch {}
   };
 
   return (
