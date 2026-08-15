@@ -444,11 +444,24 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [getValuesResult, setGetValuesResult] = useState(null); // { column, values[] }
   const [saveStatus, setSaveStatus] = useState(""); // "" | "saving" | "saved" | "error"
   const sheetsRef = useRef(file?.sheets || {}); // always-current sheets for persist
+  const hasUnsavedRef = useRef(false); // track if a save is in-flight
 
   // Keep sheetsRef in sync with the active sheet's latest data
   useEffect(() => {
     sheetsRef.current = { ...sheetsRef.current, [activeSheet]: data };
   }, [data, activeSheet]);
+
+  // Warn user if they try to refresh/close while saving
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (hasUnsavedRef.current) {
+        e.preventDefault();
+        e.returnValue = "Your changes are still saving. Leave anyway?";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   // Load sheet data when sheet changes
   useEffect(() => {
@@ -489,23 +502,31 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     (newSheetData) => {
       const allSheets = { ...sheetsRef.current, [activeSheet]: newSheetData };
       sheetsRef.current = allSheets; // update ref immediately
+      hasUnsavedRef.current = true;
       setSaveStatus("saving");
+      const body = JSON.stringify({
+        action: "update",
+        fileId: Number(file.id),
+        sheets: allSheets,
+        sheetNames: file.sheetNames || [],
+      });
       fetch("/api/files", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "update",
-          fileId: Number(file.id),
-          sheets: allSheets,
-          sheetNames: file.sheetNames || [],
-        }),
+        body,
       })
         .then((r) => {
           if (!r.ok) throw new Error("save failed");
+          hasUnsavedRef.current = false;
           setSaveStatus("saved");
           setTimeout(() => setSaveStatus(""), 2000);
         })
         .catch(() => {
+          // Retry with sendBeacon (survives page unload)
+          try {
+            navigator.sendBeacon("/api/files", new Blob([body], { type: "application/json" }));
+          } catch {}
+          hasUnsavedRef.current = false;
           setSaveStatus("error");
           setTimeout(() => setSaveStatus(""), 3000);
         });
