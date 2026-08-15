@@ -1,11 +1,32 @@
 import XlSX from 'xlsx';
 
+// Converts an Excel serial number, JS Date, or date string into a proper JS Date.
+// Returns null if the value can't be parsed as a date.
+function toJSDate(val) {
+    if (val instanceof Date) {
+        return isNaN(val.getTime()) ? null : val;
+    }
+    if (typeof val === "number") {
+        // Excel serial number -> JS Date
+        // 25569 = number of days between the Excel epoch (1899-12-30) and the Unix epoch (1970-01-01)
+        const utcDays = val - 25569;
+        const utcMs = utcDays * 86400 * 1000;
+        const d = new Date(utcMs);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof val === "string" && val.trim() !== "") {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+}
+
 class DateOperations {
     extractYear(sheet, column, newColumn) {
         const data = XlSX.utils.sheet_to_json(sheet);
         data.forEach((row) => {
-            const d = new Date(row[column]);
-            row[newColumn] = isNaN(d) ? "" : d.getFullYear();
+            const d = toJSDate(row[column]);
+            row[newColumn] = d ? d.getFullYear() : "";
         });
         return XlSX.utils.json_to_sheet(data);
     }
@@ -13,8 +34,8 @@ class DateOperations {
     extractMonth(sheet, column, newColumn) {
         const data = XlSX.utils.sheet_to_json(sheet);
         data.forEach((row) => {
-            const d = new Date(row[column]);
-            row[newColumn] = isNaN(d) ? "" : d.getMonth() + 1;
+            const d = toJSDate(row[column]);
+            row[newColumn] = d ? d.getMonth() + 1 : "";
         });
         return XlSX.utils.json_to_sheet(data);
     }
@@ -22,8 +43,8 @@ class DateOperations {
     extractDay(sheet, column, newColumn) {
         const data = XlSX.utils.sheet_to_json(sheet);
         data.forEach((row) => {
-            const d = new Date(row[column]);
-            row[newColumn] = isNaN(d) ? "" : d.getDate();
+            const d = toJSDate(row[column]);
+            row[newColumn] = d ? d.getDate() : "";
         });
         return XlSX.utils.json_to_sheet(data);
     }
@@ -32,8 +53,8 @@ class DateOperations {
         const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         const data = XlSX.utils.sheet_to_json(sheet);
         data.forEach((row) => {
-            const d = new Date(row[column]);
-            row[newColumn] = isNaN(d) ? "" : days[d.getDay()];
+            const d = toJSDate(row[column]);
+            row[newColumn] = d ? days[d.getDay()] : "";
         });
         return XlSX.utils.json_to_sheet(data);
     }
@@ -42,9 +63,9 @@ class DateOperations {
         const data = XlSX.utils.sheet_to_json(sheet);
         const msPerUnit = { days: 86400000, hours: 3600000, minutes: 60000 };
         data.forEach((row) => {
-            const a = new Date(row[columnA]);
-            const b = new Date(row[columnB]);
-            row[newColumn] = (!isNaN(a) && !isNaN(b))
+            const a = toJSDate(row[columnA]);
+            const b = toJSDate(row[columnB]);
+            row[newColumn] = (a && b)
                 ? Math.round((b - a) / (msPerUnit[unit] || msPerUnit.days))
                 : "";
         });
@@ -54,8 +75,8 @@ class DateOperations {
     addDays(sheet, column, days) {
         const data = XlSX.utils.sheet_to_json(sheet);
         data.forEach((row) => {
-            const d = new Date(row[column]);
-            if (!isNaN(d)) {
+            const d = toJSDate(row[column]);
+            if (d) {
                 d.setDate(d.getDate() + days);
                 row[column] = d.toISOString().split("T")[0];
             }
@@ -67,8 +88,8 @@ class DateOperations {
         const data = XlSX.utils.sheet_to_json(sheet);
         const today = new Date();
         data.forEach((row) => {
-            const d = new Date(row[column]);
-            if (isNaN(d)) {
+            const d = toJSDate(row[column]);
+            if (!d) {
                 row[newColumn] = "";
                 return;
             }
@@ -83,8 +104,8 @@ class DateOperations {
     isWeekend(sheet, column, newColumn) {
         const data = XlSX.utils.sheet_to_json(sheet);
         data.forEach((row) => {
-            const d = new Date(row[column]);
-            if (isNaN(d)) {
+            const d = toJSDate(row[column]);
+            if (!d) {
                 row[newColumn] = "";
                 return;
             }
