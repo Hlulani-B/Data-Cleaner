@@ -5,7 +5,7 @@ import fs from 'fs';
 export class Convert
  {
     csv_xlsx_client(file_path){
-        const workbook = XLSX.readFile(file_path);
+        const workbook = XLSX.readFile(file_path, { codepage: 65001 });
         // workbook = {
 //   SheetNames: ['Sheet1'],
 //   Sheets: {
@@ -26,7 +26,7 @@ res.download(outputPath, 'converted.xlsx', () => {
 
 
     csv_xlsx(file_path){
-        const workbook = XLSX.readFile(file_path);
+        const workbook = XLSX.readFile(file_path, { codepage: 65001 });
         // workbook = {
 //   SheetNames: ['Sheet1'],
 //   Sheets: {

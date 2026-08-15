@@ -59,7 +59,7 @@ function Dashboard() {
     reader.onload = (evt) => {
       try {
         const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
+        const workbook = XLSX.read(data, { type: "array", codepage: 65001 });
 
         const name = file.name.toLowerCase();
         const ext = name.includes(".") ? name.split(".").pop() : "";
