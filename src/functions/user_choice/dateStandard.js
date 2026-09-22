@@ -1,4 +1,4 @@
-import XLSX from "xlsx"
+import * as XLSX from "xlsx"
 
 // Converts an Excel serial number, JS Date, or date string into a proper JS Date.
 // Returns null if the value can't be parsed as a date.

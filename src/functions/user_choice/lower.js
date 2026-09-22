@@ -1,5 +1,5 @@
 
-import XLSX from "xlsx"
+import * as XLSX from "xlsx"
 
 export class Lower{
     lower(sheet, column){

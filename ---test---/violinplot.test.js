@@ -1,19 +1,36 @@
-import { violinPlot } from '../src/graphs/functions/violinplot';
-import XLSX from 'xlsx';
-import { Pool } from 'pg';
-import { AI } from '../api/ai';
+import { jest } from '@jest/globals';
 
-jest.mock('xlsx');
-jest.mock('pg');
-jest.mock('../api/ai');
+/* xlsx is consumed as `import * as XLSX`, so expose utils on the namespace too */
+jest.unstable_mockModule('xlsx', () => {
+    const utils = {
+        sheet_to_json: jest.fn(),
+        json_to_sheet: jest.fn(),
+        book_new: jest.fn(),
+        book_append_sheet: jest.fn(),
+        writeFile: jest.fn(),
+    };
+    return { utils, default: { utils } };
+});
+
+/* one shared query mock, because the graph modules build their Pool at import time */
+jest.unstable_mockModule('pg', () => {
+    const query = jest.fn().mockResolvedValue({ rows: [{ id: 1 }] });
+    return { Pool: jest.fn(() => ({ query })), query };
+});
+
+jest.unstable_mockModule('../api/ai', () => ({ AI: jest.fn() }));
+
+const { violinPlot } = await import('../src/graphs/functions/violinplot');
+const XLSX = await import('xlsx');
+const { AI } = await import('../api/ai');
+const mockQuery = (await import('pg')).query;
 
 describe('violinPlot', () => {
     let mockSheet;
-    let mockQuery;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         mockSheet = {
             '!ref': 'A1:B10',
             A1: { t: 's', v: 'Category' },
@@ -28,24 +45,19 @@ describe('violinPlot', () => {
             { Category: 'B', Value: 25 }
         ]);
 
-        mockQuery = jest.fn().mockResolvedValue({ rows: [{ id: 1 }] });
-        Pool.mockImplementation(() => ({ query: mockQuery }));
+        mockQuery.mockResolvedValue({ rows: [{ id: 1 }] });
 
-        AI.mockResolvedValue({
-            content: [{
-                text: `{
-                    "title": "Distribution Comparison",
-                    "x_axis": "Category",
-                    "y_axis": "Value",
-                    "description": "Different distributions observed"
-                }`
-            }]
-        });
+        AI.mockResolvedValue(`{
+            "title": "Distribution Comparison",
+            "x_axis": "Category",
+            "y_axis": "Value",
+            "description": "Different distributions observed"
+        }`);
     });
 
     test('should create violin plot with valid data', async () => {
         const result = await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         expect(result).toBeDefined();
         expect(mockQuery).toHaveBeenCalled();
     });
@@ -56,7 +68,7 @@ describe('violinPlot', () => {
         ]);
 
         const result = await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         expect(result).toBe("Value column must be of number type, Please choose another column");
     });
 
@@ -68,20 +80,17 @@ describe('violinPlot', () => {
         ]);
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         expect(AI).toHaveBeenCalled();
     });
 
     test('should accept custom bin count', async () => {
-        XLSX.utils.sheet_to_json.mockReturnValue([
-            { Category: 'A', Value: i } for (let i = 0; i < 50; i++)
-        ].reduce((arr, obj, i) => {
-            arr.push({ Category: 'A', Value: i });
-            return arr;
-        }, []));
+        XLSX.utils.sheet_to_json.mockReturnValue(
+            Array.from({ length: 50 }, (_, i) => ({ Category: 'A', Value: i }))
+        );
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test', 20);
-        
+
         expect(AI).toHaveBeenCalled();
     });
 
@@ -93,7 +102,7 @@ describe('violinPlot', () => {
         ]);
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         const promptCall = AI.mock.calls[0][0];
         expect(promptCall).toContain('violin plot data');
     });
@@ -106,7 +115,7 @@ describe('violinPlot', () => {
         ]);
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         expect(AI).toHaveBeenCalled();
     });
 
@@ -119,7 +128,7 @@ describe('violinPlot', () => {
         ]);
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         expect(AI).toHaveBeenCalled();
     });
 
@@ -133,13 +142,13 @@ describe('violinPlot', () => {
         ]);
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test', 5);
-        
+
         expect(AI).toHaveBeenCalled();
     });
 
     test('should insert data into database', async () => {
         await violinPlot(mockSheet, 'Category', 'Value', 'user@test.com', 'Violin plot test');
-        
+
         expect(mockQuery).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO violinplot'),
             expect.arrayContaining(['user@test.com', 'Category', 'Value'])
@@ -148,7 +157,7 @@ describe('violinPlot', () => {
 
     test('should call AI with violin plot prompt', async () => {
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         const prompt = AI.mock.calls[0][0];
         expect(prompt).toContain('violin plot data');
         expect(prompt).toContain('Category');
@@ -161,7 +170,7 @@ describe('violinPlot', () => {
         ]);
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test');
-        
+
         expect(mockQuery).toHaveBeenCalled();
     });
 
@@ -172,7 +181,7 @@ describe('violinPlot', () => {
         ]);
 
         await violinPlot(mockSheet, 'Category', 'Value', 'test@email.com', 'Test', 1);
-        
+
         expect(AI).toHaveBeenCalled();
     });
 });

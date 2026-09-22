@@ -1,4 +1,4 @@
-import XlSX from 'xlsx';
+import * as XlSX from 'xlsx';
 
 class FormattingValidation {
     currencyFormat(sheet, column, symbol = "$") {

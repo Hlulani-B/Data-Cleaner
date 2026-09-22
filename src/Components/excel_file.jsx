@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
 import ValuesPanel from "./values";
+import ExportColumnsModal from "./export_columns";
 // ── Your class files (user_choice + automatic) ──
 import { Values } from "../functions/user_choice/getValues";
 import { Clean } from "../functions/automatic/clean";
@@ -468,6 +469,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [aiSearchError, setAiSearchError] = useState(null); // AI search error message
   const [getValuesResult, setGetValuesResult] = useState(null); // { column, values[] }
   const [saveStatus, setSaveStatus] = useState(""); // "" | "saving" | "saved" | "error"
+  const [showExportColumns, setShowExportColumns] = useState(false); // export-columns modal
   const sheetsRef = useRef(file?.sheets || {}); // always-current sheets for persist
   const saveInFlightRef = useRef(false); // is a save request currently in-flight?
   const pendingSaveRef = useRef(null); // latest data waiting to be saved after current save finishes
@@ -781,6 +783,14 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
           <button className="export-btn" onClick={exportFile} title="Download as XLSX">
             Export
           </button>
+          <button
+            className="export-btn"
+            onClick={() => setShowExportColumns(true)}
+            disabled={data.length === 0}
+            title="Export selected columns as CSV / JSON / Python scripts"
+          >
+            Export Columns
+          </button>
         </div>
       </nav>
 
@@ -997,6 +1007,20 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                     >
                       <span className="func-name">Empty Values</span>
                       <span className="func-desc">Inspect & remove rows with empty cells</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="function-category">
+                  <h4 className="category-heading">Exporters</h4>
+                  <div className="functions-grid">
+                    <button
+                      className="func-card"
+                      onClick={() => setShowExportColumns(true)}
+                      disabled={loading || data.length === 0}
+                    >
+                      <span className="func-name">Export Columns</span>
+                      <span className="func-desc">Download chosen columns as CSV, JSON or pandas / NumPy scripts</span>
                     </button>
                   </div>
                 </div>
@@ -2101,6 +2125,16 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
             </button>
           </div>
         </div>
+      )}
+
+      {/* Export Columns Modal (CSV / JSON / pandas / NumPy scripts) */}
+      {showExportColumns && (
+        <ExportColumnsModal
+          columns={columns}
+          rows={data}
+          filename={file.filename || `file_${file.id}`}
+          onClose={() => setShowExportColumns(false)}
+        />
       )}
     </div>
   );

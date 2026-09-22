@@ -1,4 +1,4 @@
-import XLSX from "xlsx"
+import * as XLSX from "xlsx"
 
 export class MissingValues{
     // 1. finds rows that have at least one missing value, returns them as a sheet

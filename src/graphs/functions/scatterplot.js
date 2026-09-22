@@ -1,4 +1,4 @@
-import XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 import { Pool } from 'pg';
 import { AI } from '../../../api/ai.js';
 

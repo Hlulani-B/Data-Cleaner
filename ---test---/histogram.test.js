@@ -65,12 +65,9 @@ describe('histogram', () => {
     });
 
     test('should use default bin count of 10', async () => {
-        XLSX.utils.sheet_to_json.mockReturnValue([
-            { Values: i } for (let i = 0; i < 100; i++)
-        ].reduce((arr, obj, i) => {
-            arr.push({ Values: i });
-            return arr;
-        }, []));
+        XLSX.utils.sheet_to_json.mockReturnValue(
+            Array.from({ length: 100 }, (_, i) => ({ Values: i }))
+        );
 
         await histogram(mockSheet, 'Values', 'test@email.com', 'Test');
         
@@ -155,12 +152,9 @@ describe('histogram', () => {
     });
 
     test('should accept custom bin count', async () => {
-        XLSX.utils.sheet_to_json.mockReturnValue([
-            { Values: i } for (let i = 0; i < 50; i++)
-        ].reduce((arr, obj, i) => {
-            arr.push({ Values: i });
-            return arr;
-        }, []));
+        XLSX.utils.sheet_to_json.mockReturnValue(
+            Array.from({ length: 50 }, (_, i) => ({ Values: i }))
+        );
 
         await histogram(mockSheet, 'Values', 'test@email.com', 'Test', 20);
         

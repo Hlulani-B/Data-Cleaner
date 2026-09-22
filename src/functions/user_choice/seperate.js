@@ -1,4 +1,4 @@
-import XlSX from 'xlsx';
+import * as XlSX from 'xlsx';
 
 class Separate {
     separate(sheet, column, delimiter, occurrence = 1, new_column1, new_column2) {
