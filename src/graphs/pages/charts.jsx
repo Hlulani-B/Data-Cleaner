@@ -8,6 +8,8 @@ import {
   ComposedChart,
   XAxis, YAxis, ZAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+import { buildChartScriptFiles, supportedLibraries } from "../../utils/exports/chartScripts";
+import { downloadFiles } from "../../utils/exports/exportCommon";
 
 // ── Theme (matches Data Cleaner screenshot) ──
 const theme = {
@@ -36,7 +38,20 @@ export default function ChartViewer({ type, params, savedData, apiUrl = "/api/ch
   const [loading, setLoading] = useState(!savedData);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [scriptsOpen, setScriptsOpen] = useState(false);
+  const [selectedLibs, setSelectedLibs] = useState(() => supportedLibraries(type));
+  const [downloadingScripts, setDownloadingScripts] = useState(false);
+  const [scriptMsg, setScriptMsg] = useState("");
   const chartRef = useRef(null);
+
+  const scriptLibraries = supportedLibraries(type);
+
+  // Reset the script panel whenever a new chart is rendered
+  useEffect(() => {
+    setSelectedLibs(supportedLibraries(type));
+    setScriptsOpen(false);
+    setScriptMsg("");
+  }, [type, result]);
 
   useEffect(() => {
     // If savedData is provided, render directly from DB data — no API call
@@ -115,10 +130,36 @@ export default function ChartViewer({ type, params, savedData, apiUrl = "/api/ch
       link.download = `${(result?.title || type || "chart").replace(/\s+/g, "_").toLowerCase()}.png`;
       link.href = dataUrl;
       link.click();
+      // once the image is saved, surface the "reproduce it in Python" option
+      if (scriptLibraries.length > 0) setScriptsOpen(true);
     } catch (err) {
       console.error("Download failed:", err);
     } finally {
       setDownloading(false);
+    }
+  }
+
+  function toggleLib(lib) {
+    setSelectedLibs((prev) =>
+      scriptLibraries.filter((l) => (l === lib ? !prev.includes(l) : prev.includes(l)))
+    );
+  }
+
+  async function handleDownloadScripts() {
+    if (!result || selectedLibs.length === 0) {
+      setScriptMsg("Pick at least one library to download a script for.");
+      return;
+    }
+    setDownloadingScripts(true);
+    setScriptMsg("");
+    try {
+      const files = buildChartScriptFiles(type, result, selectedLibs);
+      const count = await downloadFiles(files);
+      setScriptMsg(`Downloaded ${count} script${count === 1 ? "" : "s"} — check your browser downloads.`);
+    } catch (err) {
+      setScriptMsg(err.message || "Script download failed");
+    } finally {
+      setDownloadingScripts(false);
     }
   }
 
@@ -152,25 +193,100 @@ export default function ChartViewer({ type, params, savedData, apiUrl = "/api/ch
           )}
         </div>
 
-        <button
-          onClick={handleDownload}
-          disabled={!result || downloading}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {scriptLibraries.length > 0 && (
+            <button
+              onClick={() => setScriptsOpen((open) => !open)}
+              disabled={!result}
+              style={{
+                background: theme.panel,
+                color: theme.accentDark,
+                border: `1px solid ${theme.accent}`,
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: result ? "pointer" : "not-allowed",
+                opacity: result ? 1 : 0.5,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Python scripts {scriptsOpen ? "▲" : "▼"}
+            </button>
+          )}
+
+          <button
+            onClick={handleDownload}
+            disabled={!result || downloading}
+            style={{
+              background: theme.accent,
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              padding: "6px 14px",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: result ? "pointer" : "not-allowed",
+              opacity: result ? 1 : 0.5,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {downloading ? "Downloading..." : "Download PNG"}
+          </button>
+        </div>
+      </div>
+
+      {scriptsOpen && result && scriptLibraries.length > 0 && (
+        <div
           style={{
-            background: theme.accent,
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            padding: "6px 14px",
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: result ? "pointer" : "not-allowed",
-            opacity: result ? 1 : 0.5,
-            whiteSpace: "nowrap",
+            background: theme.bg,
+            border: `1px solid ${theme.border}`,
+            borderRadius: 8,
+            padding: "12px 14px",
+            marginBottom: 12,
           }}
         >
-          {downloading ? "Downloading..." : "Download PNG"}
-        </button>
-      </div>
+          <p style={{ margin: "0 0 8px", fontSize: 12.5, color: theme.textMuted }}>
+            Download ready-to-run Python scripts that recreate this chart. Pick one or more
+            libraries — each one is downloaded as its own separate <code>.py</code> file with the
+            chart data embedded.
+          </p>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {scriptLibraries.map((lib) => (
+              <label
+                key={lib}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: theme.text, cursor: "pointer" }}
+              >
+                <input type="checkbox" checked={selectedLibs.includes(lib)} onChange={() => toggleLib(lib)} />
+                {lib}
+              </label>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={handleDownloadScripts}
+              disabled={downloadingScripts || selectedLibs.length === 0}
+              style={{
+                background: theme.accentDark,
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "6px 14px",
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: selectedLibs.length ? "pointer" : "not-allowed",
+                opacity: selectedLibs.length ? 1 : 0.5,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {downloadingScripts
+                ? "Downloading..."
+                : `Download ${selectedLibs.length} script${selectedLibs.length === 1 ? "" : "s"}`}
+            </button>
+            {scriptMsg && <span style={{ fontSize: 12, color: theme.accentDark }}>{scriptMsg}</span>}
+          </div>
+        </div>
+      )}
 
       <div ref={chartRef} style={{ background: theme.panel, padding: 8 }}>
         {loading && <StatusMessage text="Loading chart..." theme={theme} />}
