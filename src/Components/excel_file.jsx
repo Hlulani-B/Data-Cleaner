@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import EmptyValues from "./emptyvalues";
 import ValuesPanel from "./values";
 import ExportColumnsModal from "./export_columns";
+import Overview from "./overview";
 // ── Your class files (user_choice + automatic) ──
 import { Values } from "../functions/user_choice/getValues";
 import { Clean } from "../functions/automatic/clean";
@@ -351,6 +352,47 @@ const FUNCTION_CATEGORIES = [
 // Flat alias for any code that still expects a single array.
 const FUNCTIONS = FUNCTION_CATEGORIES.flatMap((cat) => cat.items);
 
+/* ─── Multi-column application helpers ─── */
+// Functions that must target exactly one column (they need a per-column name
+// or a single-column semantic), so they are NOT offered as multi-select.
+const SINGLE_ONLY_KEYS = new Set([
+  "renameColumn", "duplicateColumn", "getValues", "separate", "filterRows", "sortRows",
+]);
+
+// Flags that mark a function as needing the extra-parameters panel before it can run.
+const PARAM_FLAG_KEYS = [
+  "needsValueParams", "needsRemoveValue", "needsFillStrategy", "needsReplaceParams",
+  "needsRenameParams", "needsDuplicateParams", "needsFilterParams", "needsSortParams",
+  "needsDateOp", "needsAddDaysParams", "needsFormatOp", "needsValidationOp",
+  "needsTruncateParams", "needsPadParams", "needsSubstringParams", "needsCountParams",
+  "needsCheckParams", "needsRegexParams",
+];
+
+/** Does this function need its extra-parameters panel before applying? */
+function functionNeedsParams(fn) {
+  if (!fn) return false;
+  if (fn.key === "separate" || fn.key === "dateStandard" || fn.key === "typeConversion") return true;
+  return PARAM_FLAG_KEYS.some((k) => fn[k]);
+}
+
+/** Can this function be applied to several columns in one go? */
+function functionAllowsMulti(fn) {
+  return !!fn && fn.needsColumn && !SINGLE_ONLY_KEYS.has(fn.key);
+}
+
+// Functions whose extra-parameters panel already contains its own Apply button.
+// For these, the picker does NOT add a generic footer Apply button.
+const FUNCTION_OWN_APPLY = new Set([
+  "separate", "replaceValues", "rewrite", "removeRowWithValue", "fillEmpty", "replace",
+  "renameColumn", "duplicateColumn", "filterRows", "sortRows",
+  "extractYear", "extractMonth", "extractDay", "extractDayOfWeek", "ageFromBirthdate", "isWeekend",
+  "addDays", "dateDifference", "currencyFormat", "percentageFormat",
+  "emailValidityCheck", "phoneFormatCheck", "flagOutliers",
+  "truncateText", "padLeft", "padRight", "extractSubstring",
+  "countCharacters", "countWords", "containsCheck", "startsWithCheck", "endsWithCheck",
+  "regexExtract", "regexReplace",
+]);
+
 /* ─── Natural-language keywords for function search ─── */
 const FUNCTION_KEYWORDS = {
   removeEmpty: "empty blank rows delete",
@@ -461,6 +503,8 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [extraParams, setExtraParams] = useState({}); // for date format, type target, separate params, etc.
   const [multiColumns, setMultiColumns] = useState([]); // for join / concatenate multi-column selection
   const [showEmptyValues, setShowEmptyValues] = useState(false); // toggle empty values inspector
+  const [showOverview, setShowOverview] = useState(false); // toggle dataset overview inspector
+  const [confirm, setConfirm] = useState(null); // { funcDef, cols, extra } pending user confirmation
   const [mathModal, setMathModal] = useState(null); // { step: 'pick'|'config', mathOp, mathDef }
   const [searchQuery, setSearchQuery] = useState(""); // data row search filter
   const [funcSearchQuery, setFuncSearchQuery] = useState(""); // natural-language function search
@@ -669,29 +713,70 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     }
   };
 
-  /* ─── Apply a cleaning function (client-side) ─── */
-  const applyFunction = (funcDef, column, extra = {}) => {
+  /* ─── Actually run a (possibly multi-column) function over the data ─── */
+  const runApply = (funcDef, cols, extra = {}) => {
+    const columns = (Array.isArray(cols) ? cols : [cols]).filter((c) => c !== null && c !== undefined);
     try {
       pushHistory();
       const runner = FUNCTION_RUNNERS[funcDef.key];
       if (!runner) throw new Error(`Unknown function: ${funcDef.key}`);
-      const result = funcDef.needsColumn ? runner(data, column, extra) : runner(data, null, extra);
-      // getValues returns a special object — show result without modifying data
-      if (result && result.__getValuesResult) {
+
+      // Read-only inspector: getValues returns a special object for one column.
+      if (funcDef.key === "getValues") {
+        const sheet = XLSX.utils.json_to_sheet(data);
+        const unique = valuesOps.getValues(sheet, columns[0]);
         setHistory((prev) => prev.slice(0, -1)); // undo the premature history push
-        const unique = result.__getValuesResult;
-        setGetValuesResult({ column, values: unique });
-        setColumnPicker(null);
+        setGetValuesResult({ column: columns[0], values: unique });
+        closePicker();
         return;
       }
+
+      // When the same call writes to a new column for several source columns,
+      // drop the shared name so each column derives its own (e.g. price_log, tax_log).
+      const effExtra = { ...extra };
+      if (columns.length > 1) {
+        delete effExtra.newColumn;
+        delete effExtra.newName;
+        delete effExtra.newColumn1;
+        delete effExtra.newColumn2;
+      }
+
+      const targetCols = funcDef.needsColumn ? columns : [null];
+      let result = data;
+      for (const col of targetCols) {
+        result = runner(result, col, effExtra);
+      }
+
       setData(result);
       persistFile(result);
-      saveDraft(funcDef.label + (column ? ` (${column})` : ""));
-      setColumnPicker(null);
-      setExtraParams({});
+      saveDraft(funcDef.label + (columns.length ? ` (${columns.join(", ")})` : ""));
+      closePicker();
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  /* Reset every picker / confirm / params overlay after a successful run. */
+  const closePicker = () => {
+    setColumnPicker(null);
+    setExtraParams({});
+    setMultiColumns([]);
+    setConfirm(null);
+    setMathModal(null);
+  };
+
+  /* ─── Apply a cleaning function — routes through the confirmation dialog ─── */
+  const applyFunction = (funcDef, column, extra = {}) => {
+    // Determine the effective columns: multi-select wins when the picker is multi.
+    let columns = column == null ? [] : (Array.isArray(column) ? column : [column]);
+    if (columnPicker?.multi && multiColumns.length > 0) columns = [...multiColumns];
+
+    // getValues is a read-only view — no confirmation needed.
+    if (funcDef.key === "getValues") {
+      runApply(funcDef, columns, extra);
+      return;
+    }
+    setConfirm({ funcDef, cols: columns, extra });
   };
 
   /* ─── Undo last action ─── */
@@ -713,18 +798,25 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   /* ─── Handle function card click ─── */
   const handleFuncClick = (funcDef) => {
     setExtraParams({});
+    setMultiColumns([]);
     if (funcDef.isMath) {
       setMathModal({ step: "pick" });
     } else if (funcDef.multiColumn) {
       setColumnPicker({ funcKey: funcDef.key, label: funcDef.label, multiColumn: true });
-      setMultiColumns([]);
     } else if (funcDef.needsColumn) {
-      setColumnPicker({ funcKey: funcDef.key, endpoint: funcDef.endpoint, label: funcDef.label });
+      setColumnPicker({
+        funcKey: funcDef.key,
+        endpoint: funcDef.endpoint,
+        label: funcDef.label,
+        multi: functionAllowsMulti(funcDef),
+        needsParams: functionNeedsParams(funcDef),
+      });
     } else if (hasExtraParams(funcDef)) {
       // Params-only functions (no column selection needed)
       setColumnPicker({ funcKey: funcDef.key, label: funcDef.label, showParams: true });
     } else {
-      applyFunction(funcDef);
+      // Whole-table functions with no params (e.g. Remove Empty Rows, Duplicates): confirm then apply.
+      setConfirm({ funcDef, cols: [], extra: {} });
     }
   };
 
@@ -1008,6 +1100,14 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                       <span className="func-name">Empty Values</span>
                       <span className="func-desc">Inspect & remove rows with empty cells</span>
                     </button>
+                    <button
+                      className="func-card"
+                      onClick={() => setShowOverview(true)}
+                      disabled={loading || data.length === 0}
+                    >
+                      <span className="func-name">Overview</span>
+                      <span className="func-desc">Duplicate & null values plus detected type per column</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1093,15 +1193,15 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">
               {columnPicker.label}
-              {columnPicker.showParams && !columnPicker.selectedColumn
+              {columnPicker.showParams && !columnPicker.selectedColumn && !columnPicker.multi
                 ? ""
-                : columnPicker.multiColumn
+                : columnPicker.multiColumn || columnPicker.multi
                 ? " — Choose columns"
                 : " — Choose a column"}
             </h3>
 
             {/* ── Multi-column selection (join / concatenate) ── */}
-            {columnPicker.showParams && !columnPicker.selectedColumn ? null : columnPicker.multiColumn ? (
+            {columnPicker.showParams && !columnPicker.selectedColumn && !columnPicker.multi ? null : columnPicker.multiColumn ? (
               <>
                 <p className="modal-hint">Select two or more columns</p>
                 <div className="column-grid">
@@ -1190,46 +1290,53 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               </>
             ) : (
               <>
-                {/* ── Single-column selection ── */}
+                {/* ── Column selection (single or multi) ── */}
+                <p className="modal-hint">
+                  {columnPicker.multi
+                    ? "Select one or more columns to apply this to in one go"
+                    : "Choose a column"}
+                </p>
                 <div className="column-grid">
-                  {columns.map((col) => (
-                    <button
-                      key={col}
-                      className="column-chip"
-                      onClick={() => {
-                        const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
-                        if (
-                          fn.key === "separate" ||
-                          fn.needsValueParams ||
-                          fn.needsRemoveValue ||
-                          fn.needsFillStrategy ||
-                          fn.needsReplaceParams ||
-                          fn.needsRenameParams ||
-                          fn.needsDuplicateParams ||
-                          fn.needsFilterParams ||
-                          fn.needsSortParams ||
-                          fn.needsDateOp ||
-                          fn.needsAddDaysParams ||
-                          fn.needsFormatOp ||
-                          fn.needsValidationOp ||
-                          fn.needsTruncateParams ||
-                          fn.needsPadParams ||
-                          fn.needsSubstringParams ||
-                          fn.needsCountParams ||
-                          fn.needsCheckParams ||
-                          fn.needsRegexParams
-                        ) {
-                          // Open extra params instead of applying immediately
-                          setColumnPicker((prev) => ({ ...prev, selectedColumn: col, showParams: true }));
-                        } else {
-                          applyFunction(fn, col, extraParams);
-                        }
-                      }}
-                    >
-                      {col}
-                    </button>
-                  ))}
+                  {columns.map((col) => {
+                    const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
+                    const needsParams = functionNeedsParams(fn);
+                    const selected = multiColumns.includes(col);
+                    return (
+                      <button
+                        key={col}
+                        className={`column-chip ${selected ? "selected" : ""}`}
+                        onClick={() => {
+                          if (columnPicker.multi) {
+                            const next = selected
+                              ? multiColumns.filter((c) => c !== col)
+                              : [...multiColumns, col];
+                            setMultiColumns(next);
+                            setColumnPicker((prev) => ({
+                              ...prev,
+                              selectedColumn: next.length ? col : null,
+                              showParams: prev.showParams || (needsParams && next.length > 0),
+                            }));
+                          } else {
+                            setMultiColumns([col]);
+                            if (needsParams) {
+                              setColumnPicker((prev) => ({ ...prev, selectedColumn: col, showParams: true }));
+                            } else {
+                              applyFunction(fn, [col], extraParams);
+                            }
+                          }
+                        }}
+                      >
+                        {col}
+                      </button>
+                    );
+                  })}
                 </div>
+
+                {columnPicker.multi && multiColumns.length > 0 && (
+                  <div className="selected-columns-preview">
+                    <strong>Selected ({multiColumns.length}):</strong> {multiColumns.join(", ")}
+                  </div>
+                )}
               </>
             )}
 
@@ -2071,6 +2178,24 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
               </div>
             )}
 
+            {/* Generic footer Apply for multi-capable functions with no in-panel Apply */}
+            {columnPicker.multi && !FUNCTION_OWN_APPLY.has(columnPicker.funcKey) && (
+              <button
+                className="primary-btn modal-apply-btn"
+                disabled={multiColumns.length === 0}
+                onClick={() => {
+                  const fn = FUNCTIONS.find((f) => f.key === columnPicker.funcKey);
+                  applyFunction(fn, multiColumns, extraParams);
+                }}
+              >
+                {multiColumns.length > 1
+                  ? `Apply to ${multiColumns.length} columns`
+                  : multiColumns.length === 1
+                  ? `Apply to ${multiColumns[0]}`
+                  : "Apply"}
+              </button>
+            )}
+
             <button className="modal-close" onClick={() => { setColumnPicker(null); setExtraParams({}); setMultiColumns([]); }}>
               Cancel
             </button>
@@ -2136,6 +2261,87 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
           onClose={() => setShowExportColumns(false)}
         />
       )}
+
+      {/* Dataset Overview Modal (types / nulls / duplicates) */}
+      {showOverview && (
+        <Overview data={data} onClose={() => setShowOverview(false)} />
+      )}
+
+      {/* Confirmation before applying any function */}
+      {confirm && (
+        <div className="modal-overlay confirm-overlay" onClick={() => setConfirm(null)}>
+          <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Confirm &ldquo;{confirm.funcDef.label}&rdquo;</h3>
+            {(() => {
+              const shownCols = (confirm.cols && confirm.cols.length)
+                ? confirm.cols
+                : (confirm.extra?.selectedColumns && confirm.extra.selectedColumns.length
+                    ? confirm.extra.selectedColumns
+                    : [confirm.extra?.column, confirm.extra?.columnA, confirm.extra?.columnB].filter(Boolean));
+              return (
+                <>
+                  <p className="confirm-lede">
+                    {shownCols.length > 0 ? (
+                      <>Apply <strong>{confirm.funcDef.label}</strong> to the following {shownCols.length} column{shownCols.length > 1 ? "s" : ""}?</>
+                    ) : (
+                      <>Apply <strong>{confirm.funcDef.label}</strong> to all rows?</>
+                    )}
+                  </p>
+                  {shownCols.length > 0 && (
+                    <div className="confirm-cols">
+                      {shownCols.map((c) => (
+                        <span key={c} className="column-chip selected">{c}</span>
+                      ))}
+                    </div>
+                  )}
+                  <ConfirmParamSummary extra={confirm.extra} />
+                  <p className="confirm-note">This changes your data — you can undo it afterwards.</p>
+                </>
+              );
+            })()}
+            <div className="confirm-actions">
+              <button className="modal-close" onClick={() => setConfirm(null)}>Cancel</button>
+              <button
+                className="primary-btn modal-apply-btn"
+                onClick={() => runApply(confirm.funcDef, confirm.cols, confirm.extra)}
+              >
+                Confirm &amp; Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Compact, human-readable summary of the params on a confirmation dialog ─── */
+const PARAM_LABELS = {
+  format: "Date format", targetType: "Target type", delimiter: "Delimiter",
+  occurrence: "Occurrence", customString: "Custom string", newColumn: "New column",
+  newName: "New name", newColumn1: "New column 1", newColumn2: "New column 2",
+  findValue: "Find", replaceWith: "Replace with", value: "Value", condition: "Condition",
+  direction: "Direction", keyword: "Keyword", count: "Count", mode: "Mode",
+  days: "Days", symbol: "Symbol", decimals: "Decimals", stdDevThreshold: "Std-dev threshold",
+  maxLength: "Max length", length: "Length", padChar: "Pad char", start: "Start", end: "End",
+  pattern: "Pattern", flags: "Flags", substring: "Substring", prefix: "Prefix", suffix: "Suffix",
+  strategy: "Strategy", customValue: "Fill with", columnA: "Column A", columnB: "Column B",
+  unit: "Unit", paramValue: "Value", mathOp: "Math operation",
+};
+const PARAM_IGNORE = new Set(["selectedColumns", "orderedColumns", "column", "orderText"]);
+
+function ConfirmParamSummary({ extra = {} }) {
+  const entries = Object.entries(extra).filter(
+    ([k, v]) => !PARAM_IGNORE.has(k) && v !== undefined && v !== null && v !== ""
+  );
+  if (entries.length === 0) return null;
+  return (
+    <div className="confirm-params">
+      {entries.map(([k, v]) => (
+        <span key={k} className="confirm-param">
+          <strong>{PARAM_LABELS[k] || k}:</strong> {String(v)}
+        </span>
+      ))}
     </div>
   );
 }

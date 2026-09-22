@@ -63,6 +63,10 @@ Results are shown in a dismissible banner with row counts and stats.
 ### User-Selected Functions
 Applied individually after the initial clean. Some require a column or multi-column selection.
 
+- **Multi-column in one go** — nearly every column function (text case, math, dates, formats, padding, extraction, encoders, remove column, etc.) lets you **select several columns at once** in the picker and applies the same operation to all of them in a single action. A live "Selected (n)" preview lists your choices and the apply button reads "Apply to n columns".
+  - A handful of functions stay single-column because they take a per-column name or only make sense once — *Rename Column*, *Duplicate Column*, *Separate Column*, *Filter Rows*, *Sort Rows*, and *Get Unique Values*.
+- **Confirmation step** — every data-changing function shows a **confirmation dialog** before it runs, summarising the target columns and the parameters you chose (with an "undo is available" note). Cancel leaves your data untouched; read-only inspectors (Get Unique Values, Overview) skip it.
+
 #### Row Operations
 - **Remove Empty Rows** — delete rows where every cell is empty
 - **Remove Duplicates** — delete exact duplicate rows
@@ -150,6 +154,15 @@ Interactive view to inspect and remove rows with empty/missing data:
 - Color-coded table: red cells for empty values, yellow rows for rows with empties
 - Stats dashboard: total rows, rows with empty cells, fully empty rows, total empty cells
 - Batch actions: select all empty rows, select fully empty rows only, remove selected or all
+
+### Dataset Overview
+A read-only inspector (powered by a dedicated `getOverview()` analysis function) opened from the **Overview** button. It walks every column once and reports, across three tabs:
+
+- **Column Types** — the value types actually present in each column (e.g. *int, string*), cell counts per type, a **mixed-types** flag, unique-value count, and null/empty count + percentage
+- **Null Values** — every column that has missing/empty cells, with counts and percentages (or a "no nulls" confirmation)
+- **Duplicates** — duplicated **rows** (identical across all columns, shown as extra-copy groups) and repeated **values** within each column
+
+Summary cards at the top show total rows, total columns, null/empty cells, and duplicate rows at a glance. Types are classified as `int`, `float`, `string`, `boolean`, `date`, `null`, `empty`, or `invalid` (numeric-looking strings such as `"20"` count as `int`).
 
 ### Data Visualization
 AI-powered chart generation with 11 chart types. All charts are generated from the full dataset, saved to Neon Postgres, and enriched with AI-generated titles, axis labels, and insights.
@@ -251,7 +264,7 @@ npm run dev:client
 npm test
 ```
 
-243 tests across 22 suites covering all automatic and user-choice functions.
+250+ tests across 23+ suites covering all automatic and user-choice functions, including the `getOverview()` dataset-analysis function (value-type classification, null/duplicate detection).
 
 ## Build
 
@@ -303,7 +316,7 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 ├── server/
 │   └── index.js                  # Express dev server (API + Vite middleware)
 ├── src/
-│   ├── functions/                # Client-side operation classes (automatic + user_choice; incl. getValues, search)
+│   ├── functions/                # Client-side operation classes (automatic + user_choice; incl. getValues, getOverview, search)
 │   ├── graphs/
 │   │   ├── functions/            # 11 chart functions (bar, histogram, pie, scatter, line, area, box, violin, heatmap, stacked, bubble)
 │   │   ├── pages/                # ChartViewer component + ChartsPage UI
@@ -313,6 +326,7 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 │   │   ├── dashboard.jsx         # Dashboard — upload + file cards + Neon sync
 │   │   ├── excel_file.jsx        # Excel/CSV shared view — search bar, sheet sidebar, functions, modals
 │   │   ├── csv_file.jsx          # CSV view — single sheet + functions
+│   │   ├── overview.jsx          # Dataset Overview inspector (column types / nulls / duplicates)
 │   │   └── emptyvalues.jsx       # Empty values inspector component
 │   ├── utils/
 │   │   └── cleaners.js           # Client-side cleaning utilities
@@ -331,4 +345,4 @@ Fifteen tables — **Users**, **Files**, **File_Versions**, **Graphs**, plus one
 
 **Flow**
 
-**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → **Search** rows in real time via the data search bar, or **describe what you want** in the function search bar → Apply functions (column picker or multi-column modal) → Inspect **Empty Values** → View drafts and undo changes → **Export** as XLSX.
+**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → **Search** rows in real time via the data search bar, or **describe what you want** in the function search bar → Apply functions (**multi-column picker** + **confirmation dialog**) → Inspect **Empty Values** or open the **Dataset Overview** (types / nulls / duplicates) → View drafts and undo changes → **Export** as XLSX.
