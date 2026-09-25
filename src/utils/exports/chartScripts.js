@@ -1,9 +1,14 @@
 /*
  * Chart script exporter — builds standalone Python scripts that reproduce a
  * chart rendered in the visualiser using matplotlib / pandas / seaborn / plotly.
- * The chart data returned by the charts API is embedded inline as JSON, so each
- * downloaded .py file runs on its own without needing any extra input files.
- * Every selected library is produced as its own separate script.
+ *
+ * When the chart's source sheet is available (newly generated charts) the
+ * script is written FROM SCRATCH: it shows the pandas column extraction as
+ * comments, embeds the actual raw column values, recomputes the chart maths
+ * with pandas (value_counts, crosstab, correlation, groupby, histogram
+ * bins …) and only then draws the graph. When only saved chart data is
+ * available the pre-aggregated payload is embedded instead. Every selected
+ * library is produced as its own separate .py file.
  */
 
 import { sanitizeFileName, toPythonString } from "./exportCommon";
@@ -31,6 +36,14 @@ const LIBRARY_PIP = {
   pandas: "pandas matplotlib",
   seaborn: "seaborn matplotlib pandas",
   plotly: "plotly",
+};
+
+/** pip packages the from-scratch (raw data + pandas calculations) scripts need. */
+const RAW_PIP = {
+  matplotlib: "matplotlib numpy pandas",
+  pandas: "pandas matplotlib",
+  seaborn: "seaborn numpy matplotlib pandas",
+  plotly: "plotly pandas",
 };
 
 /** Chart types the UI should offer script downloads for. */
@@ -166,14 +179,17 @@ function normalize(type, result) {
 const pyStr = toPythonString;
 
 /** "# title / # chart type ..." comment block shared by every script. */
-function scriptHeader(info, type, library, filename) {
+function scriptHeader(info, type, library, filename, fromRaw) {
   return [
     `# ${info.title}`,
     `# Chart type : ${type}`,
     `# Library    : ${library}`,
+    fromRaw
+      ? "# Mode       : from scratch — raw column data embedded, chart maths recomputed here"
+      : "# Mode       : pre-aggregated chart data embedded (raw sheet not available)",
     `# Generated from Data Cleaner on ${new Date().toISOString().slice(0, 10)}`,
     "#",
-    `# Install dependencies:  pip install ${LIBRARY_PIP[library]}`,
+    `# Install dependencies:  pip install ${fromRaw ? RAW_PIP[library] : LIBRARY_PIP[library]}`,
     `# Run this script:       python ${filename}`,
     "",
     "",
@@ -584,8 +600,7 @@ function buildPlotlyScript(payload, info, stem) {
         '        x=DATA["xs"],',
         '        y=DATA["ys"],',
         '        mode="markers",',
-        '        size=DATA["sizes"],',
-        '        marker=dict(color="#A0917E", opacity=0.6),',
+        '        marker=dict(color="#A0917E", opacity=0.6, size=DATA["sizes"]),',
         "    )",
         ")"
       );
@@ -639,7 +654,7 @@ function buildPlotlyScript(payload, info, stem) {
     case "heatmap":
       body.push(
         "fig = go.Figure()",
-        'fig.add_trace(go.Heatmap(z=DATA["matrix"], x=DATA["cols"], y=DATA["rows"], colorscale="RdBu", text_auto=".2f"))'
+        'fig.add_trace(go.Heatmap(z=DATA["matrix"], x=DATA["cols"], y=DATA["rows"], colorscale="RdBu", texttemplate="%{z:.2f}"))'
       );
       layout = { ...layout, axes: false };
       break;
@@ -655,28 +670,566 @@ function buildPlotlyScript(payload, info, stem) {
       throw new Error("Unsupported chart data for the plotly script");
   }
 
-  const finish = ["fig.update_layout("];
-  finish.push(`    title=${pyStr(info.title)},`);
-  if (!layout.axes) {
-    finish.push('    template="plotly_white",');
-  } else {
-    finish.push(
-      `    xaxis_title=${pyStr(info.x)},`,
-      `    yaxis_title=${pyStr(info.y)},`,
-      '    template="plotly_white",'
-    );
+  return assemble(start, body, plotlyFinish(info, stem, { axes: layout.axes !== false }));
+}
+
+/** Shared layout / save tail for every plotly script. */
+function plotlyFinish(info, stem, { axes = true } = {}) {
+  const out = ["fig.update_layout(", `    title=${pyStr(info.title)},`];
+  if (axes) {
+    out.push(`    xaxis_title=${pyStr(info.x)},`, `    yaxis_title=${pyStr(info.y)},`);
   }
-  finish.push(
+  out.push(
+    '    template="plotly_white",',
     ")",
     `fig.write_html(${pyStr(`${stem}.html`)})`,
     "fig.show()",
     `print("saved ${stem}.html — export to PNG from the browser toolbar if needed")`
   );
-
-  return assemble(start, body, finish);
+  return out;
 }
 
-/* ──────────────────────────────── assembly ──────────────────────────────── */
+/* ─────────────────── from-scratch scripts (raw data + pandas) ────────────────── */
+
+/** Which chart params hold the column name(s) each chart type reads. */
+const COLUMN_ROLES = {
+  bar: ["column"],
+  pie: ["column"],
+  histogram: ["column"],
+  scatter: ["xColumn", "yColumn"],
+  line: ["xColumn", "yColumn"],
+  area: ["xColumn", "yColumn"],
+  bubble: ["xColumn", "yColumn", "sizeColumn"],
+  box: ["categoryColumn", "valueColumn"],
+  violin: ["categoryColumn", "valueColumn"],
+  stackedBar: ["categoryColumn", "groupColumn"],
+};
+
+/**
+ * Project the sheet that was sent to the charts API down to the raw values of
+ * the columns this chart consumed. Returns null when the sheet or the column
+ * names are unavailable (e.g. charts reloaded from the DB), in which case the
+ * caller falls back to the pre-aggregated scripts.
+ */
+function extractRawDataset(type, params) {
+  const sheet = params?.sheet;
+  if (!Array.isArray(sheet) || sheet.length === 0) return null;
+
+  const roles = {};
+  if (type === "heatmap") {
+    roles.columns = (params.columns || []).filter(Boolean);
+  } else {
+    for (const key of COLUMN_ROLES[type] || []) {
+      if (params[key]) roles[key] = params[key];
+    }
+  }
+  const columns = Array.from(new Set(type === "heatmap" ? roles.columns : Object.values(roles)));
+  if (columns.length === 0) return null;
+
+  const data = {};
+  for (const col of columns) {
+    const values = sheet.map((row) => (row && row[col] !== undefined ? row[col] : null));
+    if (!values.some((v) => v !== null && v !== "")) return null; // nothing to compute from
+    data[col] = values;
+  }
+  return {
+    kind: kindFor(type),
+    roles,
+    columns,
+    data,
+    binCount: Number(params.binCount) || 10,
+    filePath: params.filePath || "",
+  };
+}
+
+const dfCol = (name) => `df[${pyStr(name)}]`;
+const pyList = (names) => `[${names.map((n) => pyStr(n)).join(", ")}]`;
+
+/** Steps 1–2 of every from-scratch script: extraction comments + embedded raw data. */
+function rawDataBlock(ds) {
+  const extract =
+    ds.columns.length === 1
+      ? `#     chart = ${dfCol(ds.columns[0])}`
+      : `#     chart = df[${pyList(ds.columns)}]`;
+  return [
+    "# ── 1. Columns extracted from the original dataset ─────────────────────",
+    `# Source  : ${ds.filePath || "Data Cleaner dataset"}`,
+    `# Columns : ${ds.columns.join(", ")}`,
+    "# On the full dataset the extraction is just:",
+    "#     df = pd.DataFrame(all_rows)   # the uploaded sheet",
+    extract,
+    "#",
+    "# ── 2. The extracted data itself (embedded so this script stands alone) ─",
+    `RAW = json.loads(${pyStr(JSON.stringify(ds.data))})`,
+    "df = pd.DataFrame(RAW)",
+    'print(f"Loaded {len(df)} rows — recomputing the chart data from scratch")',
+    "",
+    "# ── 3. Calculations replayed in pandas (nothing pre-aggregated) ────────",
+  ];
+}
+
+const DRAW_STEP = "# ── 4. Draw the chart ──────────────────────────────────────────────";
+
+/** Step 3 — the pandas computation the chart performed, tailored per library. */
+function rawCalc(library, ds) {
+  const { kind, roles, columns } = ds;
+  switch (kind) {
+    case "bar":
+    case "pie":
+      return [
+        "# frequency of every value in the column",
+        `col_values = ${dfCol(roles.column)}.dropna().astype(str)`,
+        `counts = col_values[col_values != ""].value_counts()`,
+        "labels = counts.index.tolist()",
+        "values = counts.values.tolist()",
+      ];
+    case "histogram":
+      return [
+        "# keep only the numeric values of the column, then bin them",
+        `values = pd.to_numeric(${dfCol(roles.column)}, errors="coerce").dropna()`,
+      ];
+    case "scatter":
+      return [
+        "# drop rows missing either coordinate",
+        `plot = df.dropna(subset=${pyList([roles.xColumn, roles.yColumn])})`,
+      ];
+    case "line":
+    case "area":
+      return [
+        "# drop incomplete rows and draw in ascending x order",
+        `plot = df.dropna(subset=${pyList([roles.xColumn, roles.yColumn])}).sort_values(${pyStr(roles.xColumn)})`,
+      ];
+    case "bubble": {
+      const lines = [
+        `plot = df.dropna(subset=${pyList([roles.xColumn, roles.yColumn, roles.sizeColumn])})`,
+      ];
+      if (library === "matplotlib") {
+        lines.push(
+          "# scale the third column into a marker-size range for matplotlib",
+          `sizes = plot[${pyStr(roles.sizeColumn)}].tolist()`,
+          "lo, hi = min(sizes), max(sizes)",
+          "scaled = [120 if hi == lo else 30 + 420 * (s - lo) / (hi - lo) for s in sizes]"
+        );
+      }
+      return lines;
+    }
+    case "stacked":
+      return [
+        "# count of every (category, group) pair — a pivot table of the raw rows",
+        `ct = pd.crosstab(${dfCol(roles.categoryColumn)}, ${dfCol(roles.groupColumn)})`,
+      ];
+    case "box":
+    case "violin":
+      if (library === "seaborn") {
+        return [
+          "# seaborn computes the box / violin shapes itself — just clean the rows",
+          `clean = df.dropna(subset=${pyList([roles.categoryColumn, roles.valueColumn])})`,
+        ];
+      }
+      return [
+        "# one value array per category, drawn straight from the raw samples",
+        "grouped = (",
+        `    df.dropna(subset=${pyList([roles.categoryColumn, roles.valueColumn])})` +
+          `\n    .groupby(${pyStr(roles.categoryColumn)})[${pyStr(roles.valueColumn)}]`,
+        ")",
+        "group_labels = [str(key) for key, _ in grouped]",
+        "groups = [series.values for _, series in grouped]",
+      ];
+    case "heatmap":
+      return [
+        "# Pearson correlation between every pair of the selected columns",
+        `corr = df[${pyList(columns)}].apply(pd.to_numeric, errors="coerce").corr()`,
+      ];
+    default:
+      throw new Error("Unsupported chart data for the from-scratch script");
+  }
+}
+
+function buildRawMatplotlibScript(ds, info, stem) {
+  const start = [
+    "import json",
+    "",
+    "import matplotlib.pyplot as plt",
+    "import numpy as np",
+    "import pandas as pd",
+    "",
+    ...rawDataBlock(ds),
+  ];
+  const calc = rawCalc("matplotlib", ds);
+  const { roles, binCount } = ds;
+  const p = (name) => `plot[${pyStr(name)}]`;
+  const draw = [];
+  let finish;
+
+  switch (ds.kind) {
+    case "bar":
+      draw.push("fig, ax = plt.subplots(figsize=(9, 5))", 'ax.bar(labels, values, color="#A0917E")');
+      finish = mplFinish(info, stem, { rotate: true });
+      break;
+    case "pie":
+      draw.push("fig, ax = plt.subplots(figsize=(7, 7))", 'ax.pie(values, labels=labels, autopct="%1.1f%%")');
+      finish = mplFinish(info, stem, { xlabel: false, ylabel: false });
+      break;
+    case "histogram":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `ax.hist(values, bins=${binCount}, color="#A0917E", edgecolor="white")`
+      );
+      finish = mplFinish(info, stem);
+      break;
+    case "scatter":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `ax.scatter(${p(roles.xColumn)}, ${p(roles.yColumn)}, color="#A0917E", alpha=0.7)`
+      );
+      finish = mplFinish(info, stem);
+      break;
+    case "line":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `ax.plot(${p(roles.xColumn)}, ${p(roles.yColumn)}, color="#6B5D4F", marker="o")`
+      );
+      finish = mplFinish(info, stem);
+      break;
+    case "area":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `ax.fill_between(${p(roles.xColumn)}, ${p(roles.yColumn)}, color="#A0917E", alpha=0.35)`,
+        `ax.plot(${p(roles.xColumn)}, ${p(roles.yColumn)}, color="#6B5D4F")`
+      );
+      finish = mplFinish(info, stem);
+      break;
+    case "bubble":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `ax.scatter(${p(roles.xColumn)}, ${p(roles.yColumn)}, s=scaled, alpha=0.6, color="#A0917E")`
+      );
+      finish = mplFinish(info, stem);
+      break;
+    case "stacked":
+      draw.push(
+        'palette = plt.get_cmap("tab10").colors',
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        "bottoms = np.zeros(len(ct))",
+        "for i, name in enumerate(ct.columns):",
+        "    ax.bar(ct.index.astype(str), ct[name].values, bottom=bottoms, label=str(name), color=palette[i % len(palette)])",
+        "    bottoms = bottoms + ct[name].values",
+        "ax.legend()"
+      );
+      finish = mplFinish(info, stem, { rotate: true });
+      break;
+    case "box":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        "ax.boxplot(groups)",
+        "ax.set_xticks(range(1, len(group_labels) + 1))",
+        "ax.set_xticklabels(group_labels)"
+      );
+      finish = mplFinish(info, stem);
+      break;
+    case "violin":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        "ax.violinplot(groups, showmedians=True)",
+        "ax.set_xticks(range(1, len(group_labels) + 1))",
+        "ax.set_xticklabels(group_labels)"
+      );
+      finish = mplFinish(info, stem);
+      break;
+    case "heatmap":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(1 + 0.9 * len(corr.columns), 5))",
+        'im = ax.imshow(corr.values, cmap="coolwarm", aspect="auto")',
+        "ax.set_xticks(range(len(corr.columns)))",
+        "ax.set_xticklabels([str(c) for c in corr.columns])",
+        "ax.set_yticks(range(len(corr.index)))",
+        "ax.set_yticklabels([str(c) for c in corr.index])",
+        "for i, row in enumerate(corr.values):",
+        "    for j, value in enumerate(row):",
+        '        ax.text(j, i, f"{value:.2f}", ha="center", va="center", fontsize=8)',
+        "fig.colorbar(im, ax=ax)"
+      );
+      finish = mplFinish(info, stem, { xlabel: false, ylabel: false });
+      break;
+    default:
+      throw new Error("Unsupported chart data for the from-scratch matplotlib script");
+  }
+  return assemble(start, [...calc, "", DRAW_STEP, ...draw], finish);
+}
+
+function buildRawPandasScript(ds, info, stem) {
+  const start = [
+    "import json",
+    "",
+    "import matplotlib.pyplot as plt",
+    "import pandas as pd",
+    "",
+    ...rawDataBlock(ds),
+  ];
+  const calc = rawCalc("pandas", ds);
+  const { roles, binCount } = ds;
+  const draw = [];
+  let finish;
+
+  switch (ds.kind) {
+    case "bar":
+      draw.push('ax = counts.plot(kind="bar", legend=False, color="#A0917E", figsize=(9, 5))');
+      finish = pandasFinish(info, stem, { rotate: true });
+      break;
+    case "pie":
+      draw.push(
+        'sdf = counts.to_frame("count")',
+        'ax = sdf.plot(kind="pie", y="count", labels=sdf.index.astype(str), legend=False, autopct="%1.1f%%", figsize=(7, 7))'
+      );
+      finish = pandasFinish(info, stem, { axes: false });
+      break;
+    case "histogram":
+      draw.push(`ax = values.plot(kind="hist", bins=${binCount}, color="#A0917E", figsize=(9, 5))`);
+      finish = pandasFinish(info, stem);
+      break;
+    case "scatter":
+      draw.push(
+        `ax = plot.plot(kind="scatter", x=${pyStr(roles.xColumn)}, y=${pyStr(roles.yColumn)}, color="#A0917E", figsize=(9, 5))`
+      );
+      finish = pandasFinish(info, stem);
+      break;
+    case "line":
+      draw.push(
+        `ax = plot.plot(x=${pyStr(roles.xColumn)}, y=${pyStr(roles.yColumn)}, color="#6B5D4F", marker="o", legend=False, figsize=(9, 5))`
+      );
+      finish = pandasFinish(info, stem);
+      break;
+    case "area":
+      draw.push(
+        `ax = plot.plot(x=${pyStr(roles.xColumn)}, y=${pyStr(roles.yColumn)}, kind="area", color="#A0917E", alpha=0.5, legend=False, figsize=(9, 5))`
+      );
+      finish = pandasFinish(info, stem);
+      break;
+    case "stacked":
+      draw.push('ax = ct.plot(kind="bar", stacked=True, figsize=(9, 5))');
+      finish = pandasFinish(info, stem, { rotate: true });
+      break;
+    default:
+      throw new Error("Unsupported chart data for the from-scratch pandas script");
+  }
+  return assemble(start, [...calc, "", DRAW_STEP, ...draw], finish);
+}
+
+function buildRawSeabornScript(ds, info, stem) {
+  const start = [
+    "import json",
+    "",
+    "import matplotlib.pyplot as plt",
+    "import numpy as np",
+    "import pandas as pd",
+    "import seaborn as sns",
+    "",
+    'sns.set_theme(style="whitegrid")',
+    "",
+    ...rawDataBlock(ds),
+  ];
+  const calc = rawCalc("seaborn", ds);
+  const { roles, binCount } = ds;
+  const draw = [];
+  let finish;
+
+  switch (ds.kind) {
+    case "bar":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        'sns.barplot(x=labels, y=values, color="#A0917E", ax=ax)'
+      );
+      finish = snsFinish(info, stem, { rotate: true });
+      break;
+    case "pie":
+      draw.push(
+        "# seaborn has no pie chart — matplotlib's pie rendered with the seaborn theme",
+        "fig, ax = plt.subplots(figsize=(7, 7))",
+        'ax.pie(values, labels=labels, autopct="%1.1f%%")'
+      );
+      finish = snsFinish(info, stem, { axes: false });
+      break;
+    case "histogram":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `sns.histplot(values, bins=${binCount}, color="#A0917E", ax=ax)`
+      );
+      finish = snsFinish(info, stem);
+      break;
+    case "scatter":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `sns.scatterplot(plot, x=${pyStr(roles.xColumn)}, y=${pyStr(roles.yColumn)}, color="#A0917E", ax=ax)`
+      );
+      finish = snsFinish(info, stem);
+      break;
+    case "bubble":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `sns.scatterplot(plot, x=${pyStr(roles.xColumn)}, y=${pyStr(roles.yColumn)}, ` +
+          `size=${pyStr(roles.sizeColumn)}, sizes=(40, 500), ax=ax)`
+      );
+      finish = snsFinish(info, stem);
+      break;
+    case "line":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `sns.lineplot(plot, x=${pyStr(roles.xColumn)}, y=${pyStr(roles.yColumn)}, color="#6B5D4F", ax=ax)`
+      );
+      finish = snsFinish(info, stem);
+      break;
+    case "area":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `sns.lineplot(plot, x=${pyStr(roles.xColumn)}, y=${pyStr(roles.yColumn)}, color="#6B5D4F", ax=ax)`,
+        `ax.fill_between(plot[${pyStr(roles.xColumn)}], plot[${pyStr(roles.yColumn)}], color="#A0917E", alpha=0.35)`
+      );
+      finish = snsFinish(info, stem);
+      break;
+    case "stacked":
+      draw.push(
+        "# seaborn has no native stacked bar — matplotlib bars under the seaborn theme",
+        'palette = sns.color_palette("muted")',
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        "bottoms = np.zeros(len(ct))",
+        "for i, name in enumerate(ct.columns):",
+        "    ax.bar(ct.index.astype(str), ct[name].values, bottom=bottoms, label=str(name), color=palette[i % len(palette)])",
+        "    bottoms = bottoms + ct[name].values",
+        "ax.legend(title=None)"
+      );
+      finish = snsFinish(info, stem, { rotate: true });
+      break;
+    case "box":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `sns.boxplot(clean, x=${pyStr(roles.categoryColumn)}, y=${pyStr(roles.valueColumn)}, ax=ax)`
+      );
+      finish = snsFinish(info, stem);
+      break;
+    case "violin":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(9, 5))",
+        `sns.violinplot(clean, x=${pyStr(roles.categoryColumn)}, y=${pyStr(roles.valueColumn)}, ax=ax)`
+      );
+      finish = snsFinish(info, stem);
+      break;
+    case "heatmap":
+      draw.push(
+        "fig, ax = plt.subplots(figsize=(1 + 0.9 * len(corr.columns), 5))",
+        'sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)'
+      );
+      finish = snsFinish(info, stem, { axes: false });
+      break;
+    default:
+      throw new Error("Unsupported chart data for the from-scratch seaborn script");
+  }
+  return assemble(start, [...calc, "", DRAW_STEP, ...draw], finish);
+}
+
+function buildRawPlotlyScript(ds, info, stem) {
+  const start = [
+    "import json",
+    "",
+    "import pandas as pd",
+    "",
+    "import plotly.graph_objects as go",
+    "",
+    ...rawDataBlock(ds),
+  ];
+  const calc = rawCalc("plotly", ds);
+  const { roles, binCount } = ds;
+  const draw = ["fig = go.Figure()"];
+  let axes = true;
+
+  switch (ds.kind) {
+    case "bar":
+      draw.push('fig.add_trace(go.Bar(x=labels, y=values, marker_color="#A0917E"))');
+      break;
+    case "pie":
+      draw.push("fig.add_trace(go.Pie(labels=labels, values=values))");
+      axes = false;
+      break;
+    case "histogram":
+      draw.push(`fig.add_trace(go.Histogram(x=values, nbinsx=${binCount}, marker_color="#A0917E"))`);
+      break;
+    case "scatter":
+      draw.push(
+        `fig.add_trace(go.Scatter(x=plot[${pyStr(roles.xColumn)}], y=plot[${pyStr(roles.yColumn)}], ` +
+          'mode="markers", marker=dict(color="#A0917E")))'
+      );
+      break;
+    case "bubble":
+      draw.push(
+        "fig.add_trace(",
+        "    go.Scatter(",
+        `        x=plot[${pyStr(roles.xColumn)}],`,
+        `        y=plot[${pyStr(roles.yColumn)}],`,
+        '        mode="markers",',
+        `        marker=dict(color="#A0917E", opacity=0.6, size=plot[${pyStr(roles.sizeColumn)}]),`,
+        "    )",
+        ")"
+      );
+      break;
+    case "line":
+      draw.push(
+        `fig.add_trace(go.Scatter(x=plot[${pyStr(roles.xColumn)}], y=plot[${pyStr(roles.yColumn)}], ` +
+          'mode="lines+markers", line=dict(color="#6B5D4F")))'
+      );
+      break;
+    case "area":
+      draw.push(
+        "fig.add_trace(",
+        "    go.Scatter(",
+        `        x=plot[${pyStr(roles.xColumn)}],`,
+        `        y=plot[${pyStr(roles.yColumn)}],`,
+        '        mode="lines",',
+        '        fill="tozeroy",',
+        '        line=dict(color="#6B5D4F"),',
+        '        fillcolor="rgba(160, 145, 126, 0.35)",',
+        "    )",
+        ")"
+      );
+      break;
+    case "stacked":
+      draw.push(
+        "for name in ct.columns:",
+        "    fig.add_trace(go.Bar(x=ct.index.astype(str), y=ct[name].values, name=str(name)))",
+        'fig.update_layout(barmode="stack")'
+      );
+      break;
+    case "box":
+      draw.push(
+        "for label, samples in zip(group_labels, groups):",
+        "    fig.add_trace(go.Box(y=samples, name=label))"
+      );
+      break;
+    case "violin":
+      draw.push(
+        "for label, samples in zip(group_labels, groups):",
+        "    fig.add_trace(go.Violin(y=samples, name=label, box_visible=True, meanline_visible=True))"
+      );
+      break;
+    case "heatmap":
+      draw.push(
+        "fig.add_trace(",
+        "    go.Heatmap(",
+        "        z=corr.values,",
+        "        x=[str(c) for c in corr.columns],",
+        "        y=[str(c) for c in corr.index],",
+        '        colorscale="RdBu",',
+        '        texttemplate="%{z:.2f}",',
+        "    )",
+        ")"
+      );
+      axes = false;
+      break;
+    default:
+      throw new Error("Unsupported chart data for the from-scratch plotly script");
+  }
+  return assemble(start, [...calc, "", DRAW_STEP, ...draw], plotlyFinish(info, stem, { axes }));
+}
+
+/* ──────────────────────────────── assembly ──────────────────────────── */
 
 /** Join the start / body / finish line arrays into one Python source string. */
 function assemble(start, body, finish) {
@@ -685,12 +1238,16 @@ function assemble(start, body, finish) {
 
 /**
  * Build one standalone Python script reproducing the chart with the given library.
+ * When `params` carries the sheet that was charted, the script is written from
+ * scratch (raw column data + pandas calculations); otherwise the pre-aggregated
+ * chart payload is embedded instead.
  *
  * @param {string} type     chart type key used by the visualiser (bar, pie, ...)
  * @param {object} result   chart data returned by the charts API / saved in the DB
  * @param {"matplotlib"|"pandas"|"seaborn"|"plotly"} library
+ * @param {object} [params] the visualiser's chart params (includes `sheet`)
  */
-export function buildChartScript(type, result, library) {
+export function buildChartScript(type, result, library, params = null) {
   const normalized = normalize(type, result);
   if (!normalized) throw new Error(`No Python script support for chart type "${type}"`);
   const builder = {
@@ -704,8 +1261,18 @@ export function buildChartScript(type, result, library) {
     throw new Error(`The ${library} script cannot reproduce a ${type} chart`);
   }
   const stem = sanitizeFileName(result?.title || type).toLowerCase();
-  const content = builder({ kind: kindFor(type), ...normalized.payload }, normalized.info, stem);
-  return `#!/usr/bin/env python3\n${scriptHeader(normalized.info, type, library, `${stem}_${library}.py`)}${content}`;
+  const ds = extractRawDataset(type, params);
+  const rawBuilder = {
+    matplotlib: buildRawMatplotlibScript,
+    pandas: buildRawPandasScript,
+    seaborn: buildRawSeabornScript,
+    plotly: buildRawPlotlyScript,
+  }[library];
+  const content = ds && rawBuilder
+    ? rawBuilder(ds, normalized.info, stem)
+    : builder({ kind: kindFor(type), ...normalized.payload }, normalized.info, stem);
+  const header = scriptHeader(normalized.info, type, library, `${stem}_${library}.py`, Boolean(ds && rawBuilder));
+  return `#!/usr/bin/env python3\n${header}${content}`;
 }
 
 /** Chart type key -> normalised payload kind. */
@@ -718,15 +1285,16 @@ function kindFor(type) {
  * Libraries unsupported for the chart type are silently skipped.
  *
  * @param {string[]} libraries  defaults to every library supported for the type
+ * @param {object} [params]     the visualiser's chart params (includes `sheet`)
  */
-export function buildChartScriptFiles(type, result, libraries) {
+export function buildChartScriptFiles(type, result, libraries, params = null) {
   const stem = sanitizeFileName(result?.title || type).toLowerCase();
   const wanted = (libraries && libraries.length ? libraries : supportedLibraries(type))
     .filter((lib) => supportedLibraries(type).includes(lib));
 
   return wanted.map((library) => ({
     filename: `${stem}_${library}.py`,
-    content: buildChartScript(type, result, library),
+    content: buildChartScript(type, result, library, params),
     mime: PY_MIME,
   }));
 }

@@ -153,7 +153,9 @@ export default function ChartViewer({ type, params, savedData, apiUrl = "/api/ch
     setDownloadingScripts(true);
     setScriptMsg("");
     try {
-      const files = buildChartScriptFiles(type, result, selectedLibs);
+      // params carries the raw sheet + column picks, so the scripts are built
+      // from scratch (raw data + pandas calculations) when it is available
+      const files = buildChartScriptFiles(type, result, selectedLibs, params);
       const count = await downloadFiles(files);
       setScriptMsg(`Downloaded ${count} script${count === 1 ? "" : "s"} — check your browser downloads.`);
     } catch (err) {
@@ -247,9 +249,10 @@ export default function ChartViewer({ type, params, savedData, apiUrl = "/api/ch
           }}
         >
           <p style={{ margin: "0 0 8px", fontSize: 12.5, color: theme.textMuted }}>
-            Download ready-to-run Python scripts that recreate this chart. Pick one or more
-            libraries — each one is downloaded as its own separate <code>.py</code> file with the
-            chart data embedded.
+            Download ready-to-run Python scripts that recreate this chart from scratch. Pick
+            one or more libraries — each one is downloaded as its own separate <code>.py</code>
+            file with the raw column data embedded; the script re-runs the pandas calculations
+            and then draws the graph.
           </p>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             {scriptLibraries.map((lib) => (

@@ -45,6 +45,25 @@ const RESULTS = {
 
 const ALL_LIBRARIES = ['matplotlib', 'pandas', 'seaborn', 'plotly'];
 
+// ── Raw sheet + column picks, shaped like the visualiser's chart params ──
+const SHEET = [
+    { Gender: 'F', Region: 'North', Price: 10, Qty: 2, Cost: 5 },
+    { Gender: 'M', Region: 'South', Price: 20, Qty: 4, Cost: 15 },
+    { Gender: 'F', Region: 'South', Price: 30, Qty: 6, Cost: 25 },
+];
+const PARAMS = {
+    bar: { sheet: SHEET, column: 'Gender' },
+    histogram: { sheet: SHEET, column: 'Price' },
+    scatter: { sheet: SHEET, xColumn: 'Price', yColumn: 'Qty' },
+    line: { sheet: SHEET, xColumn: 'Price', yColumn: 'Qty' },
+    area: { sheet: SHEET, xColumn: 'Price', yColumn: 'Qty' },
+    bubble: { sheet: SHEET, xColumn: 'Price', yColumn: 'Qty', sizeColumn: 'Cost' },
+    box: { sheet: SHEET, categoryColumn: 'Gender', valueColumn: 'Price' },
+    violin: { sheet: SHEET, categoryColumn: 'Region', valueColumn: 'Price' },
+    stackedBar: { sheet: SHEET, categoryColumn: 'Gender', groupColumn: 'Region' },
+    heatmap: { sheet: SHEET, columns: ['Price', 'Qty', 'Cost'] },
+};
+
 describe('supportedLibraries', () => {
     test('offers all four libraries for simple chart types', () => {
         for (const type of ['bar', 'histogram', 'pie', 'scatter', 'line', 'area', 'stackedBar']) {
@@ -121,6 +140,18 @@ describe('buildChartScript', () => {
         has('stackedBar', 'plotly', 'barmode="stack"');
     });
 
+    test('avoids invalid plotly properties that crash the generated scripts', () => {
+        // go.Heatmap has no text_auto (that is a bar-only property) — use texttemplate
+        const heatmap = buildChartScript('heatmap', RESULTS.heatmap, 'plotly');
+        expect(heatmap).toContain('texttemplate="%{z:.2f}"');
+        expect(heatmap).not.toContain('text_auto');
+
+        // go.Scatter has no top-level size — it must live inside marker=dict(...)
+        const bubble = buildChartScript('bubble', RESULTS.bubble, 'plotly');
+        expect(bubble).not.toMatch(/^\s*size=/m);
+        expect(bubble).toMatch(/marker=dict\([^)]*size=DATA\["sizes"\]/);
+    });
+
     test('escapes tricky labels so the embedded JSON stays valid python', () => {
         const script = buildChartScript('bar', RESULTS.bar, 'matplotlib');
         // Python string literals are JSON string literals here — both parses must round-trip
@@ -179,5 +210,101 @@ describe('buildChartScriptFiles', () => {
     test('falls back to the chart type when the result has no title', () => {
         const files = buildChartScriptFiles('pie', { values: { A: 1 } }, ['plotly']);
         expect(files[0].filename).toBe('pie_plotly.py');
+    });
+
+    test('forwards the raw sheet to every script it builds', () => {
+        const files = buildChartScriptFiles('bar', RESULTS.bar, ['matplotlib', 'plotly'], PARAMS.bar);
+        expect(files).toHaveLength(2);
+        files.forEach((f) => expect(f.content).toContain('RAW = json.loads('));
+    });
+});
+
+describe('from-scratch scripts built from the raw sheet', () => {
+    test('every library embeds raw data and recomputes value counts for bar', () => {
+        for (const library of supportedLibraries('bar')) {
+            const script = buildChartScript('bar', RESULTS.bar, library, PARAMS.bar);
+            expect(script).toContain('RAW = json.loads(');
+            expect(script).not.toContain('DATA = json.loads(');
+            expect(script).toContain('df = pd.DataFrame(RAW)');
+            expect(script).toContain('#     chart = df["Gender"]');
+            expect(script).toContain('.value_counts()');
+            expect(script).toContain('from scratch — raw column data embedded');
+        }
+    });
+
+    test('histogram binning happens inside the script', () => {
+        const mpl = buildChartScript('histogram', RESULTS.histogram, 'matplotlib', PARAMS.histogram);
+        expect(mpl).toContain('values = pd.to_numeric(df["Price"], errors="coerce").dropna()');
+        expect(mpl).toContain('ax.hist(values, bins=10');
+        const plotly = buildChartScript('histogram', RESULTS.histogram, 'plotly', PARAMS.histogram);
+        expect(plotly).toContain('nbinsx=10');
+    });
+
+    test('line and area scripts sort the raw rows by the x column', () => {
+        const script = buildChartScript('line', RESULTS.line, 'seaborn', PARAMS.line);
+        expect(script).toContain('sort_values("Price")');
+        expect(script).toContain('sns.lineplot(plot');
+    });
+
+    test('box plots group the raw samples instead of embedding summary stats', () => {
+        const mpl = buildChartScript('box', RESULTS.box, 'matplotlib', PARAMS.box);
+        expect(mpl).toContain('.groupby("Gender")["Price"]');
+        expect(mpl).toContain('ax.boxplot(groups)');
+        expect(mpl).not.toContain('whislo');
+        const sns = buildChartScript('box', RESULTS.box, 'seaborn', PARAMS.box);
+        expect(sns).toContain('sns.boxplot(clean');
+        const plotly = buildChartScript('box', RESULTS.box, 'plotly', PARAMS.box);
+        expect(plotly).toContain('go.Box(y=samples, name=label)');
+    });
+
+    test('violin plots draw from the real per-category samples', () => {
+        const sns = buildChartScript('violin', RESULTS.violin, 'seaborn', PARAMS.violin);
+        expect(sns).toContain('sns.violinplot(clean');
+        expect(sns).not.toContain('bin_start');
+        expect(sns).not.toContain('rebuild');
+    });
+
+    test('heatmap recomputes the correlation matrix from raw columns', () => {
+        const script = buildChartScript('heatmap', RESULTS.heatmap, 'seaborn', PARAMS.heatmap);
+        expect(script).toContain('df[["Price", "Qty", "Cost"]]');
+        expect(script).toContain('.corr()');
+        expect(script).toContain('sns.heatmap(corr');
+    });
+
+    test('stacked bars recompute counts with pd.crosstab', () => {
+        const script = buildChartScript('stackedBar', RESULTS.stackedBar, 'pandas', PARAMS.stackedBar);
+        expect(script).toContain('ct = pd.crosstab(df["Gender"], df["Region"])');
+        expect(script).toContain('stacked=True');
+    });
+
+    test('bubble marker size stays inside the plotly marker dict', () => {
+        const script = buildChartScript('bubble', RESULTS.bubble, 'plotly', PARAMS.bubble);
+        expect(script).toContain('size=plot["Cost"]');
+        expect(script).toMatch(/marker=dict\([^)]*size=plot\[/);
+    });
+
+    test('raw payload round-trips through the embedded JSON string', () => {
+        const script = buildChartScript('scatter', RESULTS.scatter, 'matplotlib', PARAMS.scatter);
+        const match = script.match(/RAW = json\.loads\((".*")\)/m);
+        expect(match).not.toBeNull();
+        const data = JSON.parse(match[1]);
+        expect(JSON.parse(data).Price).toEqual([10, 20, 30]);
+        expect(JSON.parse(data).Qty).toEqual([2, 4, 6]);
+    });
+
+    test('falls back to embedded aggregates when no sheet is provided', () => {
+        const script = buildChartScript('bar', RESULTS.bar, 'matplotlib');
+        expect(script).toContain('DATA = json.loads(');
+        expect(script).toContain('pre-aggregated chart data embedded');
+    });
+
+    test('from-scratch scripts advertise the pandas/numpy pip dependencies', () => {
+        const script = buildChartScript('violin', RESULTS.violin, 'matplotlib', PARAMS.violin);
+        expect(script).toContain('pip install matplotlib numpy pandas');
+    });
+
+    test('scripts without a usable column selection fall back to aggregates', () => {
+        const script = buildChartScript('bar', RESULTS.bar, 'matplotlib', { sheet: SHEET });
+        expect(script).toContain('DATA = json.loads(');
     });
 });
