@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { getOverview } from "../functions/user_choice/getOverview";
 
 /* A small pill showing a type name + how many cells had it. */
@@ -20,7 +20,7 @@ function TypePill({ kind, count }) {
  *   onClose  — close handler
  */
 export default function Overview({ data, onClose }) {
-  const overview = useMemo(() => getOverview(data), [data]);
+  const overview = getOverview(data);
   const [tab, setTab] = useState("columns"); // columns | nulls | duplicates
 
   return (
