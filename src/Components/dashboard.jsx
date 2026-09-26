@@ -4,6 +4,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import * as XLSX from "xlsx";
 import { parseWorksheet } from "../utils/sheetParsers";
+import { compressJSON } from "../utils/compression";
 
 function Dashboard() {
   const [files, setFiles] = useState([]);
@@ -85,40 +86,46 @@ function Dashboard() {
           return;
         }
 
-        // Save directly to Neon first — no localStorage for file data
-        fetch("/api/files", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "save",
-            filename: file.name,
-            filetype,
-            sheets,
-            sheetNames: workbook.SheetNames,
-            userEmail: email,
-          }),
-        })
-          .then((r) => {
-            if (!r.ok) throw new Error(`Server error: ${r.status}`);
-            return r.json();
+        // Save directly to Neon — compress payload to stay under Vercel's 4.5 MB body limit
+        const payload = {
+          action: "save",
+          filename: file.name,
+          filetype,
+          sheets,
+          sheetNames: workbook.SheetNames,
+          userEmail: email,
+        };
+
+        compressJSON(payload).then((compressed) => {
+          fetch("/api/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ compressed }),
           })
-          .then((res) => {
-            if (res.file) {
-              const realId = String(res.file.id);
-              // Add to file list in state
-              setFiles((prev) => [{
-                id: realId,
-                filename: file.name,
-                filetype,
-                sheetNames: workbook.SheetNames,
-                createdAt: new Date().toISOString(),
-              }, ...prev]);
-              navigate(`/${filetype}/${realId}`);
-            }
-          })
-          .catch((err) => {
-            alert("Failed to save file: " + err.message);
-          });
+            .then((r) => {
+              if (!r.ok) throw new Error(`Server error: ${r.status}`);
+              return r.json();
+            })
+            .then((res) => {
+              if (res.file) {
+                const realId = String(res.file.id);
+                // Add to file list in state
+                setFiles((prev) => [{
+                  id: realId,
+                  filename: file.name,
+                  filetype,
+                  sheetNames: workbook.SheetNames,
+                  createdAt: new Date().toISOString(),
+                }, ...prev]);
+                navigate(`/${filetype}/${realId}`);
+              }
+            })
+            .catch((err) => {
+              alert("Failed to save file: " + err.message);
+            });
+        }).catch((err) => {
+          alert("Failed to compress file: " + err.message);
+        });
       } catch (err) {
         alert("Failed to parse file: " + err.message);
       }

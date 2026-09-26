@@ -31,6 +31,7 @@ import TextOperations from "../functions/user_choice/textOperations";
 import FormattingValidation from "../functions/user_choice/formattingValidation";
 import MathOperations from "../functions/user_choice/math";
 import { fillEmptyValues } from "../utils/cleaners";
+import { compressJSON } from "../utils/compression";
 
 // ── Class instances ──
 const valuesOps = new Values();
@@ -598,39 +599,47 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const doSave = useCallback((allSheets) => {
     saveInFlightRef.current = true;
     setSaveStatus("saving");
-    const body = JSON.stringify({
+    const payload = {
       action: "update",
       fileId: Number(file.id),
       sheets: allSheets,
       sheetNames: file.sheetNames || [],
+    };
+
+    compressJSON(payload).then((compressed) => {
+      const body = JSON.stringify({ compressed });
+      fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error("save failed");
+          setSaveStatus("saved");
+          setTimeout(() => setSaveStatus(""), 2000);
+        })
+        .catch(() => {
+          // Retry with sendBeacon (survives page unload)
+          try {
+            navigator.sendBeacon("/api/files", new Blob([body], { type: "application/json" }));
+          } catch {}
+          setSaveStatus("error");
+          setTimeout(() => setSaveStatus(""), 3000);
+        })
+        .finally(() => {
+          saveInFlightRef.current = false;
+          // If a newer change came in while this save was in-flight, flush it now
+          if (pendingSaveRef.current) {
+            const next = pendingSaveRef.current;
+            pendingSaveRef.current = null;
+            doSave(next);
+          }
+        });
+    }).catch(() => {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus(""), 3000);
+      saveInFlightRef.current = false;
     });
-    fetch("/api/files", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error("save failed");
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus(""), 2000);
-      })
-      .catch(() => {
-        // Retry with sendBeacon (survives page unload)
-        try {
-          navigator.sendBeacon("/api/files", new Blob([body], { type: "application/json" }));
-        } catch {}
-        setSaveStatus("error");
-        setTimeout(() => setSaveStatus(""), 3000);
-      })
-      .finally(() => {
-        saveInFlightRef.current = false;
-        // If a newer change came in while this save was in-flight, flush it now
-        if (pendingSaveRef.current) {
-          const next = pendingSaveRef.current;
-          pendingSaveRef.current = null;
-          doSave(next);
-        }
-      });
   }, [file]);
 
   // Debounced persist: waits 300ms, then sends the LATEST data through the serialized queue

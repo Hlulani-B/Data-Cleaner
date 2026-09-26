@@ -1,6 +1,20 @@
+import { gunzipSync } from "zlib";
 import { Database } from "./database/neon.js";
 
 const db = new Database();
+
+/**
+ * Decompress request body if it was sent as gzip-compressed base64.
+ * Client sends { compressed: "<base64-gzip>" } when payload is large.
+ */
+function decompressBody(body) {
+  if (body && typeof body.compressed === "string") {
+    const buf = Buffer.from(body.compressed, "base64");
+    const json = gunzipSync(buf).toString("utf-8");
+    return JSON.parse(json);
+  }
+  return body;
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -8,6 +22,8 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Decompress if client sent gzip-compressed payload
+    req.body = decompressBody(req.body);
     const { action } = req.body;
     if (!action) return res.status(400).json({ error: "action is required" });
 
