@@ -114,7 +114,7 @@ describe('buildChartScript', () => {
         has('bar', 'matplotlib', 'import matplotlib.pyplot as plt', 'ax.bar(');
         has('pie', 'matplotlib', 'ax.pie(');
         has('histogram', 'matplotlib', 'align="edge"');
-        has('box', 'matplotlib', 'ax.boxplot(');
+        has('box', 'matplotlib', 'ax.bxp(');
         has('violin', 'matplotlib', 'ax.violinplot(');
         has('heatmap', 'matplotlib', 'ax.imshow(');
         has('bubble', 'matplotlib', 'scaled =');
@@ -150,6 +150,15 @@ describe('buildChartScript', () => {
         const bubble = buildChartScript('bubble', RESULTS.bubble, 'plotly');
         expect(bubble).not.toMatch(/^\s*size=/m);
         expect(bubble).toMatch(/marker=dict\([^)]*size=DATA\["sizes"\]/);
+    });
+
+    test('pre-aggregated matplotlib box uses bxp (not boxplot) so stat dicts are consumed correctly', () => {
+        const script = buildChartScript('box', RESULTS.box, 'matplotlib');
+        // ax.boxplot() expects raw samples and crashes on stat dicts — ax.bxp() is the correct call
+        expect(script).toContain('ax.bxp(');
+        expect(script).not.toContain('ax.boxplot(');
+        // bxp reads tick labels from the "label" key in each stat dict
+        expect(script).toContain('"label": b["category"]');
     });
 
     test('escapes tricky labels so the embedded JSON stays valid python', () => {

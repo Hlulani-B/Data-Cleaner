@@ -294,6 +294,7 @@ function buildMatplotlibScript(payload, info, stem) {
         "boxes = DATA[\"boxes\"]",
         "stats = [",
         "    {",
+        '        "label": b["category"],',
         '        "whislo": b["min"],',
         '        "q1": b["q1"],',
         '        "med": b["median"],',
@@ -305,8 +306,7 @@ function buildMatplotlibScript(payload, info, stem) {
         "]",
         "",
         "fig, ax = plt.subplots(figsize=(9, 5))",
-        "ax.boxplot(stats, patch_artist=True)",
-        'ax.set_xticklabels([b["category"] for b in boxes])'
+        "ax.bxp(stats, patch_artist=True)"
       );
       return assemble(start, body, mplFinish(info, stem));
     case "heatmap":
