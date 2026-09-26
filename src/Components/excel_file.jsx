@@ -1382,6 +1382,15 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                   <option value="number">Number</option>
                   <option value="boolean">Boolean</option>
                 </select>
+                <button
+                  className="primary-btn modal-apply-btn"
+                  onClick={() => {
+                    const fn = FUNCTIONS.find((f) => f.key === "typeConversion");
+                    applyFunction(fn, columnPicker.selectedColumn, extraParams);
+                  }}
+                >
+                  Apply
+                </button>
               </div>
             )}
 
