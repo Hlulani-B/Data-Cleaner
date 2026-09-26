@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import ChartViewer from "./charts";
+import Notes from "../../Components/notes";
 
 // ── Theme (matches Data Cleaner) ──
 const theme = {
@@ -32,7 +33,7 @@ const CHART_TYPES = [
 export default function ChartsPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { sheet, filePath, columns, email } = location.state || {};
+  const { sheet, filePath, fileId, columns, email } = location.state || {};
 
   const [selectedChart, setSelectedChart] = useState("bar");
   const [columnMap, setColumnMap] = useState({}); // { column: "Name", xColumn: "Age", ... }
@@ -40,6 +41,7 @@ export default function ChartsPage() {
   const [generatedCharts, setGeneratedCharts] = useState([]); // { id, type, params, title }
   const [savedCharts, setSavedCharts] = useState([]); // loaded from DB
   const [loadingSaved, setLoadingSaved] = useState(true);
+  const [showNotes, setShowNotes] = useState(false);
 
   // Load saved charts from DB on mount
   useEffect(() => {
@@ -145,9 +147,16 @@ export default function ChartsPage() {
           <span style={{ color: theme.textMuted, fontSize: 14 }}>/</span>
           <span style={{ fontSize: 14, color: theme.textMuted }}>{filePath}</span>
         </div>
-        <button onClick={() => navigate(-1)} style={{ background: "none", border: "none", color: theme.accent, fontSize: 14, cursor: "pointer" }}>
-          &larr; Back
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {fileId && (
+            <button onClick={() => setShowNotes(true)} style={{ background: "none", border: `1px solid ${theme.border}`, color: theme.accent, fontSize: 13, fontWeight: 500, borderRadius: 6, padding: "5px 14px", cursor: "pointer" }}>
+              Notes
+            </button>
+          )}
+          <button onClick={() => navigate(-1)} style={{ background: "none", border: "none", color: theme.accent, fontSize: 14, cursor: "pointer" }}>
+            &larr; Back
+          </button>
+        </div>
       </nav>
 
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 20px" }}>
@@ -295,6 +304,11 @@ export default function ChartsPage() {
           </section>
         )}
       </div>
+
+      {/* Notes slideover */}
+      {showNotes && fileId && (
+        <Notes fileId={fileId} onClose={() => setShowNotes(false)} />
+      )}
     </div>
   );
 }

@@ -210,6 +210,18 @@ export class Database {
       )
     `;
 
+    // ─── Notes table ───
+    await sql`
+      CREATE TABLE IF NOT EXISTS Notes (
+        id SERIAL PRIMARY KEY,
+        file_id INTEGER NOT NULL REFERENCES Files(id) ON DELETE CASCADE,
+        title VARCHAR(500) NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
     // ─── Migrations: fix tables that were created with an older schema ───
 
     // Ensure file_path columns are TEXT (not VARCHAR(500))
@@ -345,5 +357,47 @@ export class Database {
       RETURNING email, name
     `;
     return rows[0] || null;
+  }
+
+  // ─── Notes CRUD ───
+
+  // Get all notes for a file, newest first
+  async getNotes(fileId) {
+    const sql = await getSql();
+    const rows = await sql`
+      SELECT id, file_id, title, content, created_at, updated_at
+      FROM Notes
+      WHERE file_id = ${fileId}
+      ORDER BY updated_at DESC
+    `;
+    return rows;
+  }
+
+  // Create a new note
+  async addNote(fileId, title, content) {
+    const sql = await getSql();
+    const rows = await sql`
+      INSERT INTO Notes (file_id, title, content)
+      VALUES (${fileId}, ${title}, ${content})
+      RETURNING id, file_id, title, content, created_at, updated_at
+    `;
+    return rows[0];
+  }
+
+  // Update an existing note
+  async updateNote(noteId, title, content) {
+    const sql = await getSql();
+    const rows = await sql`
+      UPDATE Notes SET title = ${title}, content = ${content}, updated_at = NOW()
+      WHERE id = ${noteId}
+      RETURNING id, file_id, title, content, created_at, updated_at
+    `;
+    return rows[0] || null;
+  }
+
+  // Delete a note
+  async deleteNote(noteId) {
+    const sql = await getSql();
+    await sql`DELETE FROM Notes WHERE id = ${noteId}`;
   }
 }

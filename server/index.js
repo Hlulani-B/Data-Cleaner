@@ -58,6 +58,14 @@ async function start() {
     console.warn("Interpret module skipped — missing dependencies:", err.code || err.message);
   }
 
+  let notes = null;
+  try {
+    const notesMod = await import("../api/notes.js");
+    notes = notesMod.default;
+  } catch (err) {
+    console.warn("Notes module skipped — missing dependencies:", err.code || err.message);
+  }
+
   // ─── Primary routes ───
   app.all("/api/operations", (req, res) => operations(req, res));
   app.all("/api/auth", (req, res) => auth(req, res));
@@ -73,6 +81,9 @@ async function start() {
   }
   if (interpret) {
     app.all("/api/interpret", (req, res) => interpret(req, res));
+  }
+  if (notes) {
+    app.all("/api/notes", (req, res) => notes(req, res));
   }
 
   // ─── Legacy routes → forward to operations (backward compat) ───

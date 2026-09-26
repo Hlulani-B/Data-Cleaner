@@ -164,6 +164,13 @@ A read-only inspector (powered by a dedicated `getOverview()` analysis function)
 
 Summary cards at the top show total rows, total columns, null/empty cells, and duplicate rows at a glance. Types are classified as `int`, `float`, `string`, `boolean`, `date`, `null`, `empty`, or `invalid` (numeric-looking strings such as `"20"` count as `int`).
 
+### Notes
+A **slideover panel** accessible from both the file view (Inspectors section) and the chart visualiser (nav bar). Slides in from the right with the previous page visible as a dimmed background.
+- **Full CRUD** — create, read, update, and delete notes per file
+- **Title + content** — each note has a title and optional free-text body
+- **PDF export** — export all notes for a file as a formatted PDF via the browser print dialog
+- **Persistent** — notes are saved to Neon Postgres and tied to the file via `file_id` foreign key
+
 ### Data Visualization
 AI-powered chart generation with 11 chart types. All charts are generated from the full dataset, saved to Neon Postgres, and enriched with AI-generated titles, axis labels, and insights.
 
@@ -206,7 +213,7 @@ AI-powered chart generation with 11 chart types. All charts are generated from t
 |--------------|----------------------------------------------------|
 | Frontend     | React 19, React Router 7, Vite 8                  |
 | Auth         | Firebase Authentication (Google Sign-In)           |
-| Backend      | Vercel serverless (6 functions) + Express dev server |
+| Backend      | Vercel serverless (7 functions) + Express dev server |
 | Database     | Neon Postgres (`@neondatabase/serverless`)         |
 | Spreadsheets | xlsx (client-side parsing and export)              |
 | Charts       | Recharts (bar, line, area, pie, scatter, composed) |
@@ -275,7 +282,7 @@ npm run preview   # preview the production build
 
 ## Architecture
 
-### Serverless Functions (5 total — Vercel free-tier compatible)
+### Serverless Functions (7 total — Vercel free-tier compatible)
 
 Vercel's free tier allows **12 serverless functions max**. Early in development, each cleaning operation was its own serverless function (18 total), which exceeded the limit. The solution: consolidate all data transforms into a single unified handler (`api/operations.js`) that dispatches based on the `operation` field. Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites.
 
@@ -287,6 +294,7 @@ Vercel's free tier allows **12 serverless functions max**. Early in development,
 | `api/auth.js`           | User registration in Neon Postgres                |
 | `api/ai.js`             | Multi-provider AI orchestration                   |
 | `api/interpret.js`      | Natural-language function search interpretation   |
+| `api/notes.js`          | Per-file notes CRUD (list, create, update, delete) + PDF export |
 
 Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.json` rewrites. The operations handler auto-detects the operation from the URL path or the `operation` field in the request body.
 
@@ -301,7 +309,7 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 ## Project Structure
 
 ```
-├── api/                          # Serverless API (6 functions)
+├── api/                          # Serverless API (7 functions)
 │   ├── functions/
 │   │   ├── automatic/            # Auto-applied operations (trim, clean, duplicates, datatype)
 │   │   └── user_choice/          # User-selected operations (case, dates, types, separate, join, math, etc.)
@@ -312,7 +320,8 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 │   ├── files.js                  # File CRUD (save/list/get/update/delete/versions)
 │   ├── auth.js                   # User registration endpoint
 │   ├── ai.js                     # Multi-provider AI orchestration
-│   └── interpret.js              # Natural-language function search interpretation
+│   ├── interpret.js              # Natural-language function search interpretation
+│   └── notes.js                  # Per-file notes CRUD + PDF export
 ├── server/
 │   └── index.js                  # Express dev server (API + Vite middleware)
 ├── src/
@@ -327,6 +336,7 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 │   │   ├── excel_file.jsx        # Excel/CSV shared view — search bar, sheet sidebar, functions, modals
 │   │   ├── csv_file.jsx          # CSV view — single sheet + functions
 │   │   ├── overview.jsx          # Dataset Overview inspector (column types / nulls / duplicates)
+│   │   ├── notes.jsx             # Notes slideover panel (CRUD + PDF export)
 │   │   └── emptyvalues.jsx       # Empty values inspector component
 │   ├── utils/
 │   │   └── cleaners.js           # Client-side cleaning utilities
@@ -341,8 +351,8 @@ Legacy routes like `/api/upper` are rewritten to `/api/operations` via `vercel.j
 
 ## Database Schema
 
-Fifteen tables — **Users**, **Files**, **File_Versions**, **Graphs**, plus one per chart type (**bargraph**, **histogram**, **piechart**, **scatterplot**, **linegraph**, **boxplot**, **heatmap**, **stackedbar**, **areachart**, **bubblechart**, **violinplot**) — track users, uploaded files, version history (drafts/undo), chart images, and persisted chart data. Tables auto-create on first request via `ensureTables()`. See [database_schema.md](database_schema.md) for full details.
+Sixteen tables — **Users**, **Files**, **File_Versions**, **Graphs**, **Notes**, plus one per chart type (**bargraph**, **histogram**, **piechart**, **scatterplot**, **linegraph**, **boxplot**, **heatmap**, **stackedbar**, **areachart**, **bubblechart**, **violinplot**) — track users, uploaded files, version history (drafts/undo), chart images, per-file notes, and persisted chart data. Tables auto-create on first request via `ensureTables()`. See [database_schema.md](database_schema.md) for full details.
 
 **Flow**
 
-**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → **Search** rows in real time via the data search bar, or **describe what you want** in the function search bar → Apply functions (**multi-column picker** + **confirmation dialog**) → Inspect **Empty Values** or open the **Dataset Overview** (types / nulls / duplicates) → View drafts and undo changes → **Export** as XLSX.
+**Login** (Google sign-in + Neon registration) → **Dashboard** → Upload or open a file → **Excel view** (sheet sidebar) or **CSV view** (single sheet) → Run **Initial Clean** (one-time, persisted) → Results banner + functions unlock → **Search** rows in real time via the data search bar, or **describe what you want** in the function search bar → Apply functions (**multi-column picker** + **confirmation dialog**) → Inspect **Empty Values** or open the **Dataset Overview** (types / nulls / duplicates) → Add **Notes** via the slideover panel (accessible from file view or visualiser) → View drafts and undo changes → **Export** as XLSX.

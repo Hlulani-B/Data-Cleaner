@@ -39,3 +39,14 @@ Same columns as Files, plus a link back to the original file and a position for 
 | file_id     | INTEGER / UUID         | FOREIGN KEY -> Files(id)      |
 | sheet_number| INTEGER                | Sheet index (only used if filetype is 'excel', null for CSV) |
 | image_path  | VARCHAR(500)           | NOT NULL — path to the saved chart image |
+
+## Notes Table
+
+| Column     | Type                  | Constraints                   |
+|------------|-----------------------|-------------------------------|
+| id         | SERIAL                | PRIMARY KEY                   |
+| file_id    | INTEGER               | NOT NULL — FOREIGN KEY -> Files(id) ON DELETE CASCADE |
+| title      | VARCHAR(500)          | NOT NULL                      |
+| content    | TEXT                  | NOT NULL — default ''          |
+| created_at | TIMESTAMPTZ           | DEFAULT NOW()                 |
+| updated_at | TIMESTAMPTZ           | DEFAULT NOW()                 |

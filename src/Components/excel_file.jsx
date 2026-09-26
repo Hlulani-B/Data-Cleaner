@@ -5,6 +5,7 @@ import EmptyValues from "./emptyvalues";
 import ValuesPanel from "./values";
 import ExportColumnsModal from "./export_columns";
 import Overview from "./overview";
+import Notes from "./notes";
 // ── Your class files (user_choice + automatic) ──
 import { Values } from "../functions/user_choice/getValues";
 import { Clean } from "../functions/automatic/clean";
@@ -504,6 +505,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
   const [multiColumns, setMultiColumns] = useState([]); // for join / concatenate multi-column selection
   const [showEmptyValues, setShowEmptyValues] = useState(false); // toggle empty values inspector
   const [showOverview, setShowOverview] = useState(false); // toggle dataset overview inspector
+  const [showNotes, setShowNotes] = useState(false); // toggle notes panel
   const [confirm, setConfirm] = useState(null); // { funcDef, cols, extra } pending user confirmation
   const [mathModal, setMathModal] = useState(null); // { step: 'pick'|'config', mathOp, mathDef }
   const [searchQuery, setSearchQuery] = useState(""); // data row search filter
@@ -862,6 +864,7 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                 state: {
                   sheet: data,
                   filePath: file.filename || `file_${file.id}`,
+                  fileId: file.id,
                   columns: data.length > 0 ? Object.keys(data[0]) : [],
                   email: localStorage.getItem("dc_userEmail") || "",
                 },
@@ -1107,6 +1110,13 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
                     >
                       <span className="func-name">Overview</span>
                       <span className="func-desc">Duplicate & null values plus detected type per column</span>
+                    </button>
+                    <button
+                      className="func-card"
+                      onClick={() => setShowNotes(true)}
+                    >
+                      <span className="func-name">Notes</span>
+                      <span className="func-desc">Add observations, TODOs, or reminders for this file</span>
                     </button>
                   </div>
                 </div>
@@ -2265,6 +2275,11 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
       {/* Dataset Overview Modal (types / nulls / duplicates) */}
       {showOverview && (
         <Overview data={data} onClose={() => setShowOverview(false)} />
+      )}
+
+      {/* Notes slideover */}
+      {showNotes && (
+        <Notes fileId={file.id} onClose={() => setShowNotes(false)} />
       )}
 
       {/* Confirmation before applying any function */}
