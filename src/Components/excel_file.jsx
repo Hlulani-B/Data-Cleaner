@@ -2528,8 +2528,11 @@ function ExcelFile() {
             <span className="nav-tab active">Excel</span>
           </div>
         </nav>
-        <main className="dashboard-main">
-          <p className="empty-msg">File not found. <Link to="/">Go back</Link></p>
+        <main className="dashboard-main" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+          <div style={{ textAlign: "center" }}>
+            <div className="loading-spinner" style={{ width: 40, height: 40, border: "4px solid #e7e0d8", borderTop: "4px solid #7e625b", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+            <p style={{ color: "#8b7d6b", fontSize: 14 }}>Loading file...</p>
+          </div>
         </main>
       </div>
     );
