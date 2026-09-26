@@ -51,7 +51,9 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A detailed, comprehensive analysis of this area chart. Discuss the overall trend direction and momentum, periods of growth versus decline, the rate of accumulation, any plateaus or sudden changes, the total volume represented by the filled area, key turning points, and what the cumulative pattern reveals about the data trajectory. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this area chart. Cover: the overall trend direction and momentum, periods of growth versus decline, the rate of accumulation, any plateaus or sudden changes, the total volume represented, key turning points, and what the cumulative pattern reveals. Each insight should cite specific values or ranges."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -71,11 +73,11 @@ Return only the JSON object, nothing else.`;
             `INSERT INTO areachart (email, filepath, x_column, y_column, points, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
-            [email, JSON.stringify(sheet), xColumn, yColumn, JSON.stringify(points), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
+            [email, JSON.stringify(sheet), xColumn, yColumn, JSON.stringify(points), JSON.stringify(chartMeta.insights || []), chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
         console.error('DB error saving area chart:', err.message);
     }
 
-    return { points, rows: data.length, ...chartMeta };
+    return { points, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

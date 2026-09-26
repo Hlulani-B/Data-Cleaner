@@ -53,7 +53,9 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A detailed, comprehensive analysis of this scatter plot. Discuss the type and strength of correlation (positive, negative, or none), whether the relationship is linear or nonlinear, any clusters or groupings visible, outliers that deviate from the pattern, the density and spread of points, gaps in the data, and what this relationship suggests about the two variables. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this scatter plot. Cover: the type and strength of correlation (positive, negative, or none), whether the relationship is linear or nonlinear, any clusters or groupings, outliers that deviate from the pattern, density and spread of points, gaps in the data, and what the relationship suggests about the two variables. Each insight should cite specific data points or ranges."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -80,7 +82,7 @@ Return only the JSON object, nothing else.`;
                 xColumn,
                 yColumn,
                 JSON.stringify(points),
-                chartMeta.description || description,
+                JSON.stringify(chartMeta.insights || []),
                 chartMeta.title,
                 chartMeta.x_axis,
                 chartMeta.y_axis
@@ -90,5 +92,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving scatter plot:', err.message);
     }
 
-    return { points, rows: data.length, ...chartMeta };
+    return { points, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

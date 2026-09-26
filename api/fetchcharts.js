@@ -75,10 +75,25 @@ export default async function handler(req, res) {
             }
           }
 
+          // The description column now stores a JSON array of insights for new charts,
+          // or a plain string for older charts — parse accordingly
+          let description = row.description || "";
+          let insights = null;
+          try {
+            const parsed = JSON.parse(description);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              insights = parsed;
+              description = "";
+            }
+          } catch {
+            // plain string description — keep as-is
+          }
+
           return {
             type,
             title: row.title || "",
-            description: row.description || "",
+            description,
+            insights,
             x_axis: row.x_axis || "",
             y_axis: row.y_axis || "",
             rows: parsedData[jsonField]

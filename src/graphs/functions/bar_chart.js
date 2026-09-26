@@ -60,7 +60,9 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis (usually 'Count' or 'Frequency')",
-  "description": "A detailed, comprehensive analysis of this bar chart data. Discuss the most and least frequent categories, the overall distribution shape, any notable gaps or imbalances between categories, the relative proportions, and any patterns or anomalies that stand out. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this bar chart. Cover: the most and least frequent categories with their counts, the overall distribution shape, notable gaps or imbalances, relative proportions, and any patterns or anomalies. Each insight should be a specific, data-driven sentence — not a generic summary."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -85,7 +87,7 @@ Return only the JSON object, nothing else.`;
                 JSON.stringify(sheet),
                 column,
                 JSON.stringify(values),
-                chartMeta.description || description,
+                JSON.stringify(chartMeta.insights || []),
                 chartMeta.title,
                 chartMeta.x_axis,
                 chartMeta.y_axis
@@ -95,5 +97,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving bar chart:', err.message);
     }
 
-    return { values, rows: data.length, ...chartMeta };
+    return { values, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

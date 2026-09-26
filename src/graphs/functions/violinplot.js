@@ -75,7 +75,9 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A detailed, comprehensive analysis of this violin plot. Discuss the density shape of each category (where values concentrate and thin out), which categories are more spread out versus concentrated, differences in central peaks, any multimodal distributions suggesting subgroups, the range and tails of each category, how the distributions compare across categories, and what the density patterns reveal about the data. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this violin plot. Cover: the density shape of each category (where values concentrate and thin out), which categories are more spread out versus concentrated, differences in central peaks, any multimodal distributions suggesting subgroups, the range and tails of each category, how distributions compare across categories, and what density patterns reveal. Each insight should cite specific ranges or counts."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -95,11 +97,11 @@ Return only the JSON object, nothing else.`;
             `INSERT INTO violinplot (email, filepath, category_column, value_column, violins, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
-            [email, JSON.stringify(sheet), categoryColumn, valueColumn, JSON.stringify(violins), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
+            [email, JSON.stringify(sheet), categoryColumn, valueColumn, JSON.stringify(violins), JSON.stringify(chartMeta.insights || []), chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
         console.error('DB error saving violin plot:', err.message);
     }
 
-    return { violins, rows: data.length, ...chartMeta };
+    return { violins, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

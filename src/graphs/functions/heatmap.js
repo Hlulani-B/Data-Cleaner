@@ -76,7 +76,9 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A detailed, comprehensive analysis of this correlation heatmap. Discuss the strongest positive and negative correlations, which variable pairs are nearly uncorrelated, any clusters of highly correlated variables, the overall correlation structure, potential multicollinearity concerns, and what these relationships suggest about the underlying data. Include specific correlation values where notable. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this correlation heatmap. Cover: the strongest positive and negative correlations with their values, which variable pairs are nearly uncorrelated, any clusters of highly correlated variables, the overall correlation structure, potential multicollinearity concerns, and what these relationships suggest. Each insight should cite specific correlation values."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -96,11 +98,11 @@ Return only the JSON object, nothing else.`;
             `INSERT INTO heatmap (email, filepath, columns, matrix, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id`,
-            [email, JSON.stringify(sheet), JSON.stringify(columns), JSON.stringify(matrix), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
+            [email, JSON.stringify(sheet), JSON.stringify(columns), JSON.stringify(matrix), JSON.stringify(chartMeta.insights || []), chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
         console.error('DB error saving heatmap:', err.message);
     }
 
-    return { matrix, rows: data.length, ...chartMeta };
+    return { matrix, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

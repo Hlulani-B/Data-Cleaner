@@ -117,7 +117,9 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble) w
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis (usually 'Count' or 'Frequency')",
-  "description": "A detailed, data-driven analysis citing specific bin counts and ranges."
+  "insights": [
+    "4-6 separate bullet-point observations with specific bin ranges and counts. Cover: the shape classification (normal/skewed/uniform/bimodal) with evidence from the actual bin counts, the peak bin and its count, the spread and range of the data, any notable gaps between adjacent bins, and what the distribution reveals. Each insight must cite specific bin ranges and their counts — do not make generic statements."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -142,7 +144,7 @@ Return only the JSON object, nothing else.`;
                 JSON.stringify(sheet),
                 column,
                 JSON.stringify(bins),
-                chartMeta.description || description,
+                JSON.stringify(chartMeta.insights || []),
                 chartMeta.title,
                 chartMeta.x_axis,
                 chartMeta.y_axis
@@ -152,5 +154,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving histogram:', err.message);
     }
 
-    return { bins, rows: data.length, ...chartMeta };
+    return { bins, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

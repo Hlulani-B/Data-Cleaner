@@ -183,11 +183,17 @@ export default function ChartViewer({ type, params, savedData, apiUrl = "/api/ch
               {result.title}
             </h3>
           )}
-          {result?.description && (
+          {Array.isArray(result?.insights) && result.insights.length > 0 ? (
+            <ul style={{ margin: "6px 0 0", padding: "0 0 0 18px", fontSize: 13, color: theme.textMuted, maxWidth: 560, lineHeight: 1.55 }}>
+              {result.insights.map((point, i) => (
+                <li key={i} style={{ marginBottom: 3 }}>{point}</li>
+              ))}
+            </ul>
+          ) : result?.description ? (
             <p style={{ margin: "4px 0 0", fontSize: 13, color: theme.textMuted, maxWidth: 520 }}>
               {result.description}
             </p>
-          )}
+          ) : null}
           {result?.rows != null && (
             <p style={{ margin: "4px 0 0", fontSize: 12, color: theme.accent }}>
               {result.rows.toLocaleString()} rows processed

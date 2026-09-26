@@ -51,7 +51,9 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A detailed, comprehensive analysis of this bubble chart. Discuss the relationship between all three variables (X, Y, and size), any clusters or groupings of bubbles, the largest and smallest bubbles and their positions, outliers, whether larger values of one variable tend to coincide with larger or smaller values of another, density patterns, gaps, and what the three-way comparison reveals. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this bubble chart. Cover: the relationship between all three variables (X, Y, and size), any clusters or groupings, the largest and smallest bubbles and their positions, outliers, whether larger values of one variable coincide with larger or smaller values of another, density patterns, and gaps. Each insight should cite specific data points."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -71,11 +73,11 @@ Return only the JSON object, nothing else.`;
             `INSERT INTO bubblechart (email, filepath, x_column, y_column, size_column, points, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              RETURNING id`,
-            [email, JSON.stringify(sheet), xColumn, yColumn, sizeColumn, JSON.stringify(points), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
+            [email, JSON.stringify(sheet), xColumn, yColumn, sizeColumn, JSON.stringify(points), JSON.stringify(chartMeta.insights || []), chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
         console.error('DB error saving bubble chart:', err.message);
     }
 
-    return { points, rows: data.length, ...chartMeta };
+    return { points, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

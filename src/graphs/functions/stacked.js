@@ -63,7 +63,9 @@ Respond with ONLY a valid JSON object (no code, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A detailed, comprehensive analysis of this stacked bar chart. Discuss which category-group combinations dominate, the relative proportions within each category, whether the group distribution is consistent across categories or varies significantly, any categories that are heavily skewed toward one group, notable imbalances, and what the breakdown reveals about the relationship between the category and group variables. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this stacked bar chart. Cover: which category-group combinations dominate, the relative proportions within each category, whether the group distribution is consistent across categories or varies significantly, any categories heavily skewed toward one group, notable imbalances, and what the breakdown reveals about the relationship between the variables. Each insight should cite specific counts."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -83,11 +85,11 @@ Return only the JSON object, nothing else.`;
             `INSERT INTO stackedbar (email, filepath, category_column, group_column, bars, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
-            [email, JSON.stringify(sheet), categoryColumn, groupColumn, JSON.stringify(bars), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
+            [email, JSON.stringify(sheet), categoryColumn, groupColumn, JSON.stringify(bars), JSON.stringify(chartMeta.insights || []), chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
         console.error('DB error saving stacked bar:', err.message);
     }
 
-    return { bars, rows: data.length, ...chartMeta };
+    return { bars, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

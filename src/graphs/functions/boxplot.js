@@ -78,7 +78,9 @@ Respond with ONLY a valid JSON object (no markdown, no backticks, no preamble):
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label for the x-axis",
   "y_axis": "Label for the y-axis",
-  "description": "A detailed, comprehensive analysis of this box plot. Discuss the median values across categories, the spread (IQR) of each category, which categories have the widest and narrowest distributions, the presence and location of outliers, whether distributions are symmetric or skewed, how the quartiles compare between categories, and any notable differences in central tendency or variability. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this box plot. Cover: the median values across categories, the spread (IQR) of each category, which have the widest and narrowest distributions, the presence and location of outliers, whether distributions are symmetric or skewed, how quartiles compare between categories, and notable differences in central tendency or variability. Each insight should cite specific values."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -98,11 +100,11 @@ Return only the JSON object, nothing else.`;
             `INSERT INTO boxplot (email, filepath, category_column, value_column, boxes, description, title, x_axis, y_axis)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING id`,
-            [email, JSON.stringify(sheet), categoryColumn, valueColumn, JSON.stringify(boxes), chartMeta.description || description, chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
+            [email, JSON.stringify(sheet), categoryColumn, valueColumn, JSON.stringify(boxes), JSON.stringify(chartMeta.insights || []), chartMeta.title, chartMeta.x_axis, chartMeta.y_axis]
         );
     } catch (err) {
         console.error('DB error saving box plot:', err.message);
     }
 
-    return { boxes, rows: data.length, ...chartMeta };
+    return { boxes, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

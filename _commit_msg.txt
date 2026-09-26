@@ -1,0 +1,23 @@
+feat(chartScripts): generate from-scratch Python scripts with raw data + pandas calculations
+
+The Python chart scripts now rebuild the chart from scratch instead of embedding
+pre-aggregated data. Each generated .py file:
+
+1. Shows the pandas column extraction as comments (e.g. # df["Gender"])
+2. Embeds the actual raw column values as JSON (RAW = json.loads(...))
+3. Replays the chart calculations with pandas (value_counts, crosstab, corr,
+   groupby, histogram bins, etc.)
+4. Draws the graph from the computed results
+
+When the raw sheet is available (newly generated charts), the from-scratch path
+is used. When only saved chart data exists (reloaded from DB), the pre-aggregated
+fallback is used.
+
+Changes:
+- chartScripts.js: added COLUMN_ROLES, extractRawDataset, rawDataBlock, rawCalc,
+  and four raw builders (matplotlib/pandas/seaborn/plotly)
+- buildChartScript/buildChartScriptFiles now accept optional params (sheet + columns)
+- charts.jsx: passes params to buildChartScriptFiles; updated panel wording
+- chartScripts.test.js: added 13 new tests for from-scratch scripts (36 total)
+
+All 36 tests pass. 40 generated scripts compile as valid Python.

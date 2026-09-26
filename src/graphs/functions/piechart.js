@@ -60,7 +60,9 @@ Based on this data, respond with ONLY a valid JSON object (no markdown, no backt
   "title": "A short, descriptive chart title (max 8 words)",
   "x_axis": "Label describing the categories (e.g. the column name)",
   "y_axis": "Label describing what the slice size represents (usually 'Count' or 'Proportion')",
-  "description": "A detailed, comprehensive analysis of this pie chart's proportions. Discuss the dominant and smallest slices, whether the distribution is even or heavily skewed, the relative sizes of the major categories versus minor ones, any surprising or negligible segments, and what this breakdown reveals about the data composition. Be thorough and insightful."
+  "insights": [
+    "4-6 separate bullet-point observations about this pie chart. Cover: the dominant and smallest slices with their proportions, whether the distribution is even or heavily skewed, relative sizes of major vs minor categories, any surprising or negligible segments, and what the breakdown reveals about data composition. Each insight should be a specific, data-driven sentence."
+  ]
 }
 
 Return only the JSON object, nothing else.`;
@@ -86,7 +88,7 @@ Return only the JSON object, nothing else.`;
                 JSON.stringify(sheet),
                 column,
                 JSON.stringify(values),
-                chartMeta.description || description,
+                JSON.stringify(chartMeta.insights || []),
                 chartMeta.title,
                 chartMeta.x_axis,
                 chartMeta.y_axis
@@ -96,5 +98,5 @@ Return only the JSON object, nothing else.`;
         console.error('DB error saving pie chart:', err.message);
     }
 
-    return { values, rows: data.length, ...chartMeta };
+    return { values, rows: data.length, ...chartMeta, description: chartMeta.description || description };
 }

@@ -1,0 +1,5 @@
+﻿d9c47d8 feat(chartScripts): generate from-scratch Python scripts with raw data + pandas calculations
+dc8135b Add Dataset Overview inspector, multi-column function selection, and apply confirmation
+f03b8d9 Add Python chart script downloads to visualiser: new chartScripts.js exporter (matplotlib/pandas/seaborn/plotly, one separate .py per library with inline chart data), library picker panel in ChartViewer next to Download PNG, 22 new tests
+9bdf6cf feat: export columns as CSV/JSON/pandas/numpy scripts; fix xlsx namespace imports for build
+7b7d863 refactor: frontend now uses class files from user_choice and automatic

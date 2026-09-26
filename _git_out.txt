@@ -1,0 +1,18 @@
+﻿On branch main
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	_commit_msg.txt
+	_dump_py.mjs
+	_git_ops.ps1
+	_git_out.txt
+
+nothing added to commit but untracked files present (use "git add" to track)
+powershell : To https://github.com/Hlulani-B/Data-Cleaner.git
+At line:1 char:2
++  powershell -ExecutionPolicy Bypass -File _git_ops.ps1 2>&1 | Out-Fil ...
++  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (To https://gith...ata-Cleaner.git: 
+   String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+   dc8135b..d9c47d8  main -> main
