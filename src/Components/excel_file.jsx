@@ -18,6 +18,7 @@ import { MissingValues } from "../functions/user_choice/missingValues";
 import { DateStandard } from "../functions/user_choice/dateStandard";
 import { TypeConversion } from "../functions/user_choice/typeConversion";
 import { Duplicate } from "../functions/automatic/duplicates";
+import { Datatype } from "../functions/automatic/datatype";
 import { Search } from "../functions/user_choice/search";
 import Separate from "../functions/user_choice/seperate";
 import Join from "../functions/user_choice/join";
@@ -42,6 +43,7 @@ const missingValuesInst = new MissingValues();
 const dateStandardInst = new DateStandard();
 const typeConversionInst = new TypeConversion();
 const duplicateInst = new Duplicate();
+const datatypeInst = new Datatype();
 const searchInst = new Search();
 const separateInst = new Separate();
 const joinInst = new Join();
@@ -648,15 +650,19 @@ export function FileView({ file, fileType, navLabel, sheetNames, activeSheet, on
     pushHistory();
     const beforeRows = data.length;
 
-    // Use the same Clean class the backend uses for /api/operations clean.
-    const sheet = XLSX.utils.json_to_sheet(data);
-    const cleanedSheet = new Clean().clean(sheet);
-    let current = XLSX.utils.sheet_to_json(cleanedSheet, { defval: "" });
+    // 1. Trim + remove empty rows (same Clean class the backend uses)
+    const cleanSheet = new Clean().clean(XLSX.utils.json_to_sheet(data));
+    let current = XLSX.utils.sheet_to_json(cleanSheet, { defval: "" });
     const afterClean = current.length;
 
-    current = removeDuplicates(current);
+    // 2. Remove duplicate rows
+    const dedupSheet = duplicateInst.duplicate(XLSX.utils.json_to_sheet(current));
+    current = XLSX.utils.sheet_to_json(dedupSheet, { defval: "" });
     const afterDedup = current.length;
-    current = detectDatatypes(current);
+
+    // 3. Detect & convert numeric datatypes
+    const typedSheet = datatypeInst.datatype(XLSX.utils.json_to_sheet(current));
+    current = XLSX.utils.sheet_to_json(typedSheet, { defval: "" });
 
     const duplicatesRemoved = afterClean - afterDedup;
     const emptyRowsRemoved = beforeRows - afterClean;
