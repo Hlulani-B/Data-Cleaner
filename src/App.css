@@ -1562,6 +1562,14 @@
   text-align: center;
 }
 
+.ev-check-col input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #7e625b;
+  pointer-events: auto;
+}
+
 .ev-row-empty {
   background: #fff8e1;
 }
