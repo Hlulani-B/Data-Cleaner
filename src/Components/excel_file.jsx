@@ -68,7 +68,27 @@ const FUNCTION_RUNNERS = {
   proper: (data, col) => run(data, (s) => properInst.proper(s, col)),
   removeColumn: (data, col) => run(data, (s) => removeColumnInst.remove_column(s, col)),
   dateStandard: (data, col, extra) => run(data, (s) => dateStandardInst.dateStandard(s, col, extra.format || "YYYY-MM-DD")),
-  typeConversion: (data, col, extra) => run(data, (s) => typeConversionInst.typeConversion(s, col, extra.targetType || "string")),
+  typeConversion: (data, col, extra) => {
+    const targetType = extra.targetType || "string";
+    return data.map((row) => {
+      const out = { ...row };
+      const val = out[col];
+      if (val === undefined || val === null || val === "") return out;
+      if (targetType === "number") {
+        const num = Number(val);
+        if (!isNaN(num)) out[col] = num;
+      } else if (targetType === "string") {
+        out[col] = String(val);
+      } else if (targetType === "boolean") {
+        if (typeof val === "string") {
+          out[col] = val.toLowerCase() === "true" || val === "1";
+        } else {
+          out[col] = Boolean(val);
+        }
+      }
+      return out;
+    });
+  },
   separate: (data, col, extra) => run(data, (s) => separateInst.separate(
     s, col, extra.delimiter || ",", Number(extra.occurrence) || 1,
     extra.newColumn1 || `${col}_1`, extra.newColumn2 || `${col}_2`
